@@ -1,0 +1,17 @@
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = BASE_DIR / "output"
+VIDEO_DIR = OUTPUT_DIR / "videos"
+AUDIO_DIR = OUTPUT_DIR / "audio"
+BROLL_DIR = OUTPUT_DIR / "broll"
+
+VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+BROLL_DIR.mkdir(parents=True, exist_ok=True)
+
+PEXELS_API_KEY_ENV = "PEXELS_API_KEY"
+DEFAULT_VOICE = "en-US-JennyNeural"
+TARGET_RESOLUTION = (1080, 1920)
+TARGET_FPS = 30
+MIN_AUDIO_SECONDS = 60
