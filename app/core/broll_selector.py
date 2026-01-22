@@ -1,5 +1,4 @@
 import random
-import re
 from collections import Counter
 
 STOPWORDS = {
@@ -45,39 +44,28 @@ STOPWORDS = {
     "like",
 }
 
-IMPLIED_VISUALS = {
-    "scrolling": ["phone scrolling", "thumb swipe", "social media feed"],
-    "scroll": ["phone scrolling", "thumb swipe", "social media feed"],
-    "money": ["cash closeup", "counting cash", "wallet hands"],
-    "budget": ["budget notebook", "calculator hands", "spreadsheet desk"],
-    "saving": ["saving jar", "piggy bank", "transfer app"],
-    "spending": ["checkout counter", "card payment", "shopping cart"],
-    "work": ["office work", "typing hands", "late night desk"],
-    "attention": ["focused face", "concentration", "eyes closeup"],
-    "system": ["workflow", "checklist", "automation app"],
-    "habit": ["routine morning", "alarm clock", "daily planner"],
-    "phone": ["phone screen", "mobile app", "hands phone"],
-    "impulse": ["impulse buy", "checkout tap", "shopping decision"],
-    "friction": ["slow motion hands", "pause gesture", "hesitation"],
-    "default": ["settings screen", "toggle switch", "automation"],
-    "leak": ["dripping water", "leaking pipe", "wasting time"],
-    "calendar": ["calendar planning", "schedule board", "planner desk"],
-    "rich": ["city skyline", "modern lifestyle", "success routine"],
-    "boring": ["quiet office", "minimal desk", "calm workspace"],
-    "future": ["sunrise city", "long road", "looking ahead"],
+EMOTION_QUERY_MAP = {
+    "uneasy": ["person alone room", "dim bedroom night", "quiet hallway"],
+    "comfortable": ["couple laughing indoors", "relaxed home evening", "cozy couch"],
+    "confused": ["person thinking window", "staring at phone night", "confused face"],
+    "anxious": ["pacing room", "city rain night", "hands nervous"],
+    "realisation": ["person sitting still", "deep breath window", "moment of clarity"],
+    "reflection": ["sunrise window", "calm street morning", "quiet coffee"],
+    "regret": ["looking down alone", "sad person room", "night window"],
+    "tension": ["tense face", "hands clenched", "dark room"],
 }
 
 FALLBACK_QUERIES = [
-    "city motion",
-    "hands typing",
-    "people walking street",
-    "night office",
+    "person alone room",
+    "hands nervous",
+    "city rain night",
+    "quiet street evening",
     "phone closeup",
-    "abstract motion",
+    "walking alone night",
 ]
 
 
-def split_script(script: str, max_lines_per_segment: int = 2) -> list[str]:
+def split_script(script: str, max_lines_per_segment: int = 3) -> list[str]:
     lines = [line.strip() for line in script.splitlines() if line.strip()]
     if not lines:
         return [script]
@@ -88,10 +76,7 @@ def split_script(script: str, max_lines_per_segment: int = 2) -> list[str]:
 
 
 def _tokenize(text: str) -> list[str]:
-    tokens = [
-        "".join(char for char in word.lower() if char.isalpha())
-        for word in re.split(r"\s+", text)
-    ]
+    tokens = ["".join(char for char in word.lower() if char.isalpha()) for word in text.split()]
     return [token for token in tokens if token and token not in STOPWORDS]
 
 
@@ -102,21 +87,35 @@ def _top_keywords(tokens: list[str], limit: int = 4) -> list[str]:
     return [word for word, _ in counts.most_common(limit)]
 
 
+def _infer_emotion(text: str) -> str:
+    lowered = text.lower()
+    if any(word in lowered for word in ["uneasy", "nervous", "tension", "tense"]):
+        return "uneasy"
+    if any(word in lowered for word in ["comfortable", "calm", "normal", "safe"]):
+        return "comfortable"
+    if any(word in lowered for word in ["confused", "unclear", "question", "why"]):
+        return "confused"
+    if any(word in lowered for word in ["anxious", "anxiety", "panic", "eggshells", "afraid"]):
+        return "anxious"
+    if any(word in lowered for word in ["realized", "realised", "click", "turning point", "moment"]):
+        return "realisation"
+    if any(word in lowered for word in ["reflection", "learned", "lesson", "looking back"]):
+        return "reflection"
+    if any(word in lowered for word in ["regret", "wish", "should have"]):
+        return "regret"
+    return random.choice(["uneasy", "confused", "anxious", "reflection"])
+
+
 def extract_queries(text: str, min_queries: int = 3, max_queries: int = 5) -> list[str]:
+    emotion = _infer_emotion(text)
+    queries = list(EMOTION_QUERY_MAP.get(emotion, []))
+
     tokens = _tokenize(text)
     keywords = _top_keywords(tokens)
-    implied = []
-    for token in keywords:
-        implied.extend(IMPLIED_VISUALS.get(token, []))
-
-    queries = []
-    for phrase in implied:
-        queries.append(phrase)
-
     if keywords:
-        queries.append(" ".join(keywords[:2]))
-        if len(keywords) > 2:
-            queries.append(" ".join(keywords[1:3]))
+        queries.append("person " + keywords[0])
+        if len(keywords) > 1:
+            queries.append("hands " + keywords[1])
 
     while len(queries) < min_queries:
         queries.append(random.choice(FALLBACK_QUERIES))

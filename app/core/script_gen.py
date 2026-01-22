@@ -7,7 +7,7 @@ from app.config import MIN_AUDIO_SECONDS
 WORDS_PER_SECOND = 2.2
 MAX_WORDS_PER_LINE = 12
 MAX_LINES = 120
-MAX_PASSES = 10
+MAX_EXPANSION_PASSES = 2
 
 
 @dataclass
@@ -28,72 +28,80 @@ def _trim_line(line: str) -> str:
     return " ".join(words[:MAX_WORDS_PER_LINE])
 
 
-def _build_base_lines() -> list[str]:
-    opens = [
-        "Stop scrolling for ten seconds.",
-        "Quick shock: money obeys friction, not effort.",
-        "Here is the weird rule most people miss.",
-        "This is the money pattern nobody talks about.",
+def _story_theme() -> str:
+    themes = [
+        "relationship red flags",
+        "friend betrayal",
+        "work and boss situations",
+        "family conflict",
+        "realisation moments",
     ]
-    contrasts = [
-        "Working harder feels right, but it is a trap.",
-        "Saving more is not the move. Saving earlier is.",
-        "Budgeting fails when it is a mood, not a system.",
-        "Spending looks fast. Outcomes are slow.",
+    return random.choice(themes)
+
+
+def _build_story_lines() -> list[str]:
+    theme = _story_theme()
+    hooks = [
+        "I didn't think this was a red flag at the time.",
+        "I ignored a small sign, and it snowballed fast.",
+        "I told myself it was nothing. It wasn't.",
+        "I wish I noticed this sooner.",
     ]
-    reveals = [
-        "The rule is simple: remove steps from saving.",
-        "The real switch is default behavior.",
-        "Friction decides the outcome every time.",
-        "Your money moves where your attention sits.",
+    contexts = [
+        f"This happened during a {theme} phase in my life.",
+        "We were close, so I let things slide.",
+        "It started as a normal week, nothing dramatic.",
+        "I was trying to keep things calm and normal.",
     ]
-    value_hits = [
-        "Automate the transfer on payday.",
-        "Rename accounts so your brain obeys the labels.",
-        "Add a 24-hour pause for every cart checkout.",
-        "Track hesitation, not transactions.",
+    escalations = [
+        "Little things kept piling up.",
+        "The tone shifted in small ways I brushed off.",
+        "I kept second-guessing my own reactions.",
+        "I started feeling tense even before we spoke.",
     ]
-    twists = [
-        "Boring habits beat loud goals.",
-        "Quiet systems create loud results.",
-        "The smallest pause kills the biggest impulse.",
-        "The real flex is stability, not hype.",
+    turning_points = [
+        "Then one moment flipped everything.",
+        "The turning point was quick and sharp.",
+        "One comment finally made it click.",
+        "A small scene made the whole pattern obvious.",
+    ]
+    reflections = [
+        "After that, I saw how often I ignored my gut.",
+        "I realized I was making excuses for behavior that hurt.",
+        "Looking back, I wasn't being honest with myself.",
+        "I learned that quiet discomfort adds up fast.",
     ]
     ctas = [
-        "Test this for one week and watch what changes.",
-        "Try it today and see which habit breaks first.",
-        "Save this so you can build the system later.",
-        "Send this to your future self.",
+        "Has anyone else experienced this?",
+        "Would you have noticed this sooner?",
+        "Is this a common pattern, or just me?",
+        "What would you have done differently?",
     ]
 
-    lines = [
-        random.choice(opens),
-        random.choice(contrasts),
-        random.choice(reveals),
-        random.choice(value_hits),
-        random.choice(twists),
+    base_lines = [
+        random.choice(hooks),
+        random.choice(contexts),
+        random.choice(escalations),
+        random.choice(turning_points),
+        random.choice(reflections),
         random.choice(ctas),
     ]
-    return [_trim_line(line) for line in lines]
+
+    return [_trim_line(line) for line in base_lines]
 
 
-def _expand_lines() -> list[str]:
+def _expand_story_lines() -> list[str]:
     expansions = [
-        "Every tap is a vote for tomorrow.",
-        "Make spending slower than temptation.",
-        "Make saving faster than excuses.",
-        "Your calendar leaks money.",
-        "Your phone makes buying frictionless.",
-        "Fix the default, not the motivation.",
-        "Replace guilt with design.",
-        "Small switches create big outcomes.",
-        "The rich move money first, then live.",
-        "Most budgets fail after day three.",
-        "Systems win when energy fades.",
-        "Feel rich by removing tiny leaks.",
-        "Friction is your secret ally.",
-        "Attention decides what grows.",
-        "Make the rule visible, then repeat it.",
+        "I kept telling myself I was overreacting.",
+        "There were small pauses that felt heavy.",
+        "I felt uneasy, but I stayed quiet.",
+        "It got subtle, then it got loud.",
+        "I noticed how I was walking on eggshells.",
+        "I started replaying conversations in my head.",
+        "I felt anxious for no clear reason.",
+        "One day I realized I was always apologizing.",
+        "The pattern was obvious once I named it.",
+        "After that, I finally exhaled.",
     ]
     random.shuffle(expansions)
     return [_trim_line(line) for line in expansions]
@@ -108,12 +116,12 @@ def _truncate_lines(lines: list[str]) -> list[str]:
 
 def _pad_recap(lines: list[str], max_lines: int) -> list[str]:
     recap_lines = [
-        "Make it automatic, not emotional.",
-        "Slow the spend. Speed the save.",
-        "Design beats motivation.",
-        "Keep the rule visible daily.",
-        "Small switches create big outcomes.",
-        "Friction is your ally.",
+        "I learned to trust the tension I felt.",
+        "Now I pay attention to the first uneasy moment.",
+        "It was a hard lesson, but it helped me reset.",
+        "I still think about how fast it shifted.",
+        "I try to listen to my own instincts now.",
+        "It changed how I handle similar situations.",
     ]
     for line in recap_lines:
         if len(lines) >= max_lines:
@@ -133,12 +141,12 @@ def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
             used.add(line)
 
     try:
-        for line in _build_base_lines():
+        for line in _build_story_lines():
             add_unique(line)
 
         passes = 0
-        while _estimate_seconds("\\n".join(lines)) < min_seconds and passes < MAX_PASSES:
-            for line in _expand_lines():
+        while _estimate_seconds("\\n".join(lines)) < min_seconds and passes < MAX_EXPANSION_PASSES:
+            for line in _expand_story_lines():
                 if _estimate_seconds("\\n".join(lines)) >= min_seconds:
                     break
                 add_unique(line)
