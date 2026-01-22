@@ -1,3 +1,4 @@
+import math
 import random
 from dataclasses import dataclass
 from datetime import datetime
@@ -33,24 +34,30 @@ def _build_video_path() -> Path:
 def _gather_broll(script: str, min_clips: int) -> list[Path]:
     client = PexelsClient()
     segments = broll_selector.split_script(script)
-    keyword_sets = broll_selector.build_keyword_sets(segments)
-    generic_fallbacks = ["city", "technology", "abstract motion", "people", "lifestyle"]
+    query_sets = broll_selector.build_query_sets(segments)
+    generic_fallbacks = [
+        "hands typing",
+        "city motion",
+        "phone closeup",
+        "people walking street",
+        "office overtime",
+    ]
 
     collected: list[Path] = []
     used_ids: set[int] = set()
 
-    for keywords in keyword_sets:
-        query = " ".join(keywords)
-        candidates = client.search_videos(query)
-        random.shuffle(candidates)
-        for candidate in candidates:
-            if candidate.video_id in used_ids:
-                continue
-            used_ids.add(candidate.video_id)
-            downloaded = client.download_videos([candidate])
-            collected.extend(downloaded)
-            if len(collected) >= min_clips:
-                return collected
+    for queries in query_sets:
+        for query in queries:
+            candidates = client.search_videos(query)
+            random.shuffle(candidates)
+            for candidate in candidates:
+                if candidate.video_id in used_ids:
+                    continue
+                used_ids.add(candidate.video_id)
+                downloaded = client.download_videos([candidate])
+                collected.extend(downloaded)
+                if len(collected) >= min_clips:
+                    return collected
 
     while len(collected) < min_clips:
         fallback_query = random.choice(generic_fallbacks)
@@ -82,7 +89,7 @@ def run_pipeline(status_callback) -> PipelineResult:
         tts_result = synthesize_speech(script.text, audio_path)
 
     status_callback("Downloading B-roll...")
-    min_clips = max(6, int(tts_result.duration_seconds // 8))
+    min_clips = max(12, math.ceil(tts_result.duration_seconds / 1.6))
     broll_paths = _gather_broll(script.text, min_clips)
 
     if len(broll_paths) < min_clips:

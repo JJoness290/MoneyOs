@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import random
 from pathlib import Path
 
 from moviepy.editor import AudioFileClip, ColorClip, VideoFileClip, concatenate_videoclips
@@ -67,10 +68,15 @@ def build_video(
             if raw_clip is None:
                 continue
             clip = _fit_to_vertical(raw_clip)
-            clip_duration = min(clip.duration, audio_duration - current_time)
+            target = random.uniform(1.2, 2.0)
+            clip_duration = min(clip.duration, audio_duration - current_time, 2.5, target)
             if clip_duration <= 0:
                 clip.close()
                 continue
+            start = 0.0
+            if clip.duration > clip_duration:
+                start = random.uniform(0, max(0.0, clip.duration - clip_duration))
+            clip = clip.subclip(start, start + clip_duration)
             clips.append(clip)
             current_time += clip_duration
 

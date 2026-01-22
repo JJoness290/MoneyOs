@@ -3,7 +3,8 @@ from dataclasses import dataclass
 
 from app.config import MIN_AUDIO_SECONDS
 
-WORDS_PER_SECOND = 2.6
+WORDS_PER_SECOND = 2.9
+MAX_WORDS_PER_LINE = 12
 
 
 @dataclass
@@ -17,54 +18,107 @@ def _estimate_seconds(text: str) -> float:
     return word_count / WORDS_PER_SECOND
 
 
-def _base_sections() -> list[str]:
-    hooks = [
-        "Here is a question that should bother you:",
-        "Quick thought experiment:",
-        "Imagine this scenario:",
-        "This is a quiet money mystery:",
+def _trim_line(line: str) -> str:
+    words = line.split()
+    if len(words) <= MAX_WORDS_PER_LINE:
+        return line
+    return " ".join(words[:MAX_WORDS_PER_LINE])
+
+
+def _build_base_lines() -> list[str]:
+    opens = [
+        "Stop scrolling for ten seconds.",
+        "Quick shock: money obeys friction, not effort.",
+        "Here is the weird rule most people miss.",
+        "This is the money pattern nobody talks about.",
     ]
-    angles = [
-        "Why do tiny habits beat giant plans?",
-        "What actually controls your spending?",
-        "How does attention change your financial outcomes?",
-        "What makes wealth look boring up close?",
+    contrasts = [
+        "Working harder feels right, but it is a trap.",
+        "Saving more is not the move. Saving earlier is.",
+        "Budgeting fails when it is a mood, not a system.",
+        "Spending looks fast. Outcomes are slow.",
     ]
-    bodies = [
-        "Most people blame willpower, but the real driver is friction. If saving is hard, you will dodge it. If spending is easy, you will default to it.",
-        "Your brain treats every purchase as a tiny vote for the future you live in. The problem is those votes happen at high speed, while results show up slowly.",
-        "The fastest way to feel richer is to make money feel slower. A short pause before checkout can cut impulse spending more than any budget spreadsheet.",
-        "A lifestyle that looks expensive on camera can still be fragile. The difference is whether money works quietly in the background or screams for attention.",
+    reveals = [
+        "The rule is simple: remove steps from saving.",
+        "The real switch is default behavior.",
+        "Friction decides the outcome every time.",
+        "Your money moves where your attention sits.",
     ]
-    tactics = [
-        "One simple rule: decide on a default. Automate savings the day income lands, then let spending happen with what remains.",
-        "Another rule: rename accounts by purpose. Your brain follows labels more than logic.",
-        "Try a 24-hour buffer for online buys. If the desire survives a full day, it is real. If it vanishes, you just saved money.",
-        "Track only one number for a week: how many times you hesitated. That hesitation count will tell you where your money leaks live.",
+    value_hits = [
+        "Automate the transfer on payday.",
+        "Rename accounts so your brain obeys the labels.",
+        "Add a 24-hour pause for every cart checkout.",
+        "Track hesitation, not transactions.",
     ]
-    closes = [
-        "The point is not perfection. It is building a system that makes the right choice the easy choice.",
-        "If you want your money to grow, give it a stable rhythm instead of dramatic resets.",
-        "Small design choices beat big motivation speeches. You can feel the difference in a month.",
-        "The secret is boring on purpose. Boring is what compounds.",
+    twists = [
+        "Boring habits beat loud goals.",
+        "Quiet systems create loud results.",
+        "The smallest pause kills the biggest impulse.",
+        "The real flex is stability, not hype.",
     ]
-    return [
-        f"{random.choice(hooks)} {random.choice(angles)}",
-        random.choice(bodies),
-        random.choice(tactics),
-        random.choice(closes),
+    ctas = [
+        "Test this for one week and watch what changes.",
+        "Try it today and see which habit breaks first.",
+        "Save this so you can build the system later.",
+        "Send this to your future self.",
     ]
+
+    lines = [
+        random.choice(opens),
+        random.choice(contrasts),
+        random.choice(reveals),
+        random.choice(value_hits),
+        random.choice(twists),
+        random.choice(ctas),
+    ]
+    return [_trim_line(line) for line in lines]
+
+
+def _expand_lines() -> list[str]:
+    expansions = [
+        "Every tap is a vote for tomorrow.",
+        "Make spending slower than temptation.",
+        "Make saving faster than excuses.",
+        "Your calendar leaks money.",
+        "Your phone makes buying frictionless.",
+        "Fix the default, not the motivation.",
+        "Replace guilt with design.",
+        "Small switches create big outcomes.",
+        "The rich move money first, then live.",
+        "Most budgets fail after day three.",
+        "Systems win when energy fades.",
+        "Feel rich by removing tiny leaks.",
+        "Friction is your secret ally.",
+        "Attention decides what grows.",
+        "Make the rule visible, then repeat it.",
+    ]
+    random.shuffle(expansions)
+    return [_trim_line(line) for line in expansions]
 
 
 def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
-    sections = []
-    while True:
-        sections.extend(_base_sections())
-        script = " ".join(sections)
-        estimated_seconds = _estimate_seconds(script)
-        if estimated_seconds >= min_seconds:
-            return ScriptResult(text=script, estimated_seconds=estimated_seconds)
+    lines: list[str] = []
+    used = set()
 
-        sections.append(
-            "Here is the twist: the small changes feel tiny today, but they stack into real freedom when you stop leaking attention."
-        )
+    def add_unique(line: str) -> None:
+        if line not in used:
+            lines.append(line)
+            used.add(line)
+
+    for line in _build_base_lines():
+        add_unique(line)
+
+    for line in _expand_lines():
+        if _estimate_seconds("\\n".join(lines)) >= min_seconds:
+            break
+        add_unique(line)
+
+    while _estimate_seconds("\\n".join(lines)) < min_seconds:
+        for line in _expand_lines():
+            if _estimate_seconds("\\n".join(lines)) >= min_seconds:
+                break
+            add_unique(line)
+
+    script = "\\n".join(lines)
+    estimated_seconds = _estimate_seconds(script)
+    return ScriptResult(text=script, estimated_seconds=estimated_seconds)
