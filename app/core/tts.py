@@ -1,9 +1,10 @@
 import asyncio
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 import edge_tts
-from moviepy.editor import AudioFileClip
+from moviepy.editor import AudioFileClip, concatenate_audioclips
 
 from app.config import DEFAULT_VOICE, TTS_RATE
 
@@ -12,6 +13,7 @@ from app.config import DEFAULT_VOICE, TTS_RATE
 class TTSResult:
     audio_path: Path
     duration_seconds: float
+    chunk_count: int
 
 
 def _estimate_seconds(text: str) -> float:
@@ -19,28 +21,70 @@ def _estimate_seconds(text: str) -> float:
     return word_count / 2.2
 
 
+def split_script_for_tts(text: str, max_chars: int = 900) -> list[str]:
+    """
+    Split on sentence boundaries.
+    Never split mid-sentence.
+    """
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    sentences = [sentence.strip() for sentence in sentences if sentence.strip()]
+    chunks: list[str] = []
+    current = ""
+    for sentence in sentences:
+        candidate = f"{current} {sentence}".strip() if current else sentence
+        if len(candidate) <= max_chars:
+            current = candidate
+            continue
+        if current:
+            chunks.append(current)
+        current = sentence
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def _generate_chunk_audio(text: str, output_path: Path, voice: str) -> float:
+    async def _run() -> None:
+        communicate = edge_tts.Communicate(text, voice=voice, rate=TTS_RATE)
+        await communicate.save(str(output_path))
+
+    asyncio.run(_run())
+    audio = AudioFileClip(str(output_path))
+    duration = float(audio.duration)
+    audio.close()
+    if duration <= 1:
+        raise RuntimeError("Generated audio chunk is too short or invalid")
+    return duration
+
+
 def generate_tts(script_text: str, output_path: Path, voice: str = DEFAULT_VOICE) -> TTSResult:
     """
     Generates full audio from text in ONE pass.
     Returns duration in seconds.
     """
-    async def _run() -> None:
-        communicate = edge_tts.Communicate(script_text, voice=voice, rate=TTS_RATE)
-        await communicate.save(str(output_path))
+    chunks = split_script_for_tts(script_text)
+    if not chunks:
+        raise RuntimeError("Script text is empty after splitting.")
 
-    asyncio.run(_run())
+    chunk_paths: list[Path] = []
+    for index, chunk in enumerate(chunks):
+        chunk_path = output_path.with_name(f"{output_path.stem}_chunk{index}.mp3")
+        _generate_chunk_audio(chunk, chunk_path, voice)
+        chunk_paths.append(chunk_path)
+
+    clips = [AudioFileClip(str(path)) for path in chunk_paths]
+    final_audio = concatenate_audioclips(clips)
+    final_audio.write_audiofile(str(output_path), logger=None)
+    final_audio.close()
+    for clip in clips:
+        clip.close()
 
     audio = AudioFileClip(str(output_path))
     duration = float(audio.duration)
     audio.close()
 
-    if duration <= 1:
-        raise RuntimeError("Generated audio is too short or invalid")
-    if duration < 30:
-        raise RuntimeError("Generated audio is too short for TikTok length requirements")
-
     expected = _estimate_seconds(script_text)
     if duration + 1 < expected:
         raise RuntimeError("Generated audio appears truncated compared to script length")
 
-    return TTSResult(audio_path=output_path, duration_seconds=duration)
+    return TTSResult(audio_path=output_path, duration_seconds=duration, chunk_count=len(chunks))

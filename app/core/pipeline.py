@@ -37,6 +37,9 @@ def run_pipeline(status_callback) -> PipelineResult:
     status_callback("Generating script...")
     audio_path = _build_audio_path()
     tts_result = generate_tts(sanitized_script, audio_path)
+    status_callback(
+        f"TTS chunks: {tts_result.chunk_count}, audio: {tts_result.duration_seconds:.2f}s"
+    )
     if tts_result.duration_seconds < MIN_AUDIO_SECONDS:
         raise RuntimeError("Generated audio is shorter than 60 seconds.")
 
@@ -44,5 +47,7 @@ def run_pipeline(status_callback) -> PipelineResult:
     video_path = _build_video_path()
     video_result = build_video(sanitized_script, tts_result.audio_path, video_path)
 
-    status_callback("Done")
+    status_callback(
+        f"Done (audio: {tts_result.duration_seconds:.2f}s, video: {video_result.duration_seconds:.2f}s)"
+    )
     return PipelineResult(script=script, tts=tts_result, video=video_result)
