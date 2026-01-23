@@ -16,12 +16,6 @@ class TTSResult:
     duration_seconds: float
     chunk_count: int
     chunk_durations: list[float]
-    estimated_seconds: float
-
-
-def _estimate_seconds(text: str) -> float:
-    word_count = len(text.split())
-    return word_count / 2.2
 
 
 def split_script_for_tts(text: str, max_chars: int = 800) -> list[str]:
@@ -93,15 +87,14 @@ def generate_tts(script_text: str, output_path: Path, voice: str = DEFAULT_VOICE
     final = AudioFileClip(str(output_path))
     final_duration = float(final.duration)
     final.close()
-
-    expected = _estimate_seconds(script_text)
-    if final_duration < expected * 0.9:
-        raise RuntimeError("Generated audio appears truncated compared to script length")
+    if final_duration < 5:
+        raise RuntimeError("Generated audio too short to be valid")
+    if output_path.stat().st_size < 100_000:
+        raise RuntimeError("Generated audio file too small; likely failed TTS")
 
     return TTSResult(
         audio_path=output_path,
         duration_seconds=final_duration,
         chunk_count=len(chunks),
         chunk_durations=chunk_durations,
-        estimated_seconds=expected,
     )

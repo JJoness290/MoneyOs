@@ -40,8 +40,7 @@ def run_pipeline(status_callback) -> PipelineResult:
     status_callback(
         "TTS chunks="
         f"{tts_result.chunk_count} | chunk_durations={tts_result.chunk_durations} | "
-        f"final_audio={tts_result.duration_seconds:.2f}s | "
-        f"estimated={tts_result.estimated_seconds:.2f}s"
+        f"final_audio={tts_result.duration_seconds:.2f}s"
     )
     if tts_result.duration_seconds < MIN_AUDIO_SECONDS:
         raise RuntimeError("Generated audio is shorter than 60 seconds.")
