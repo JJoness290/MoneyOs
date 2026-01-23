@@ -10,7 +10,6 @@ MINECRAFT_BG_DIR = BASE_DIR / "assets" / "minecraft"
 VIDEO_DIR.mkdir(parents=True, exist_ok=True)
 AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 BROLL_DIR.mkdir(parents=True, exist_ok=True)
-MINECRAFT_BG_DIR.mkdir(parents=True, exist_ok=True)
 
 PEXELS_API_KEY_ENV = "PEXELS_API_KEY"
 DEFAULT_VOICE = "en-US-JennyNeural"

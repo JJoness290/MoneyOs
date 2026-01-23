@@ -54,9 +54,19 @@ def _save_usage_history(history: list[str]) -> None:
 
 
 def _ensure_background_clips() -> list[Path]:
+    if not MINECRAFT_BG_DIR.exists() or not MINECRAFT_BG_DIR.is_dir():
+        raise RuntimeError(
+            "NO MINECRAFT BACKGROUND FOUND.\n"
+            "Place at least one video in assets/minecraft/\n"
+            "Generation has been aborted."
+        )
     backgrounds = sorted(MINECRAFT_BG_DIR.glob("*.mp4"))
     if not backgrounds:
-        raise RuntimeError("No Minecraft background videos found in assets/minecraft.")
+        raise RuntimeError(
+            "NO MINECRAFT BACKGROUND FOUND.\n"
+            "Place at least one video in assets/minecraft/\n"
+            "Generation has been aborted."
+        )
     return backgrounds
 
 
@@ -89,7 +99,10 @@ def _load_background(audio_duration: float) -> VideoFileClip:
     bg = VideoFileClip(str(bg_path)).without_audio()
     bg = _fit_background(bg)
     if bg.duration < audio_duration:
-        raise RuntimeError("Background video shorter than audio")
+        raise RuntimeError(
+            "Minecraft background shorter than audio. "
+            "Provide longer footage."
+        )
     return bg.subclip(0, audio_duration)
 
 
