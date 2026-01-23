@@ -1,4 +1,3 @@
-import logging
 import random
 import re
 from dataclasses import dataclass
@@ -6,7 +5,7 @@ from dataclasses import dataclass
 from app.config import MIN_AUDIO_SECONDS
 
 WORDS_PER_SECOND = 3.0
-MAX_WORDS_PER_LINE = 12
+MAX_WORDS_PER_LINE = 18
 MAX_LINES = 520
 MIN_TARGET_SECONDS = 600
 MIN_TARGET_WORDS = 2000
@@ -66,7 +65,7 @@ def _expansion_axes() -> list[str]:
 def _topic_pool() -> list[dict]:
     return [
         {
-            "topic": "How performance metrics reshape decisions inside modern institutions",
+            "topic": "how performance metrics reshape decisions inside modern institutions",
             "axes": [
                 "historical_evolution",
                 "incentive_structures",
@@ -76,7 +75,7 @@ def _topic_pool() -> list[dict]:
             ],
         },
         {
-            "topic": "Why algorithmic ranking systems reward the wrong behaviors",
+            "topic": "why algorithmic ranking systems reward the wrong behaviors",
             "axes": [
                 "historical_evolution",
                 "incentive_structures",
@@ -86,7 +85,7 @@ def _topic_pool() -> list[dict]:
             ],
         },
         {
-            "topic": "How financial incentives distort truth in knowledge platforms",
+            "topic": "how financial incentives distort truth in knowledge platforms",
             "axes": [
                 "historical_evolution",
                 "incentive_structures",
@@ -108,43 +107,42 @@ def _select_topic() -> dict:
     return chosen
 
 
-def _section_templates() -> dict[str, list[str]]:
+def _section_templates(topic: str) -> dict[str, list[str]]:
     return {
         "cold_open": [
-            "Most systems reward what they can measure, not what they truly need.",
-            "The strange part is that the numbers feel objective, but they are steering us.",
-            "Here is the contradiction: better data can make worse decisions.",
-            "The question is not who is right, but which incentives are doing the talking.",
-            "If you want to understand modern power, follow the metrics people optimize.",
+            f"Here is the strange part about {topic}.",
+            "The numbers look clean, but the behavior gets messy.",
+            "We measure the wrong thing and then blame people for the outcome.",
+            "The real story is not who failed. It is what the system rewarded.",
+            "Once you see the incentives, the pattern becomes obvious.",
         ],
         "problem_setup": [
-            "We live inside systems that translate messy human goals into simplified scores.",
-            "Those scores do not just reflect reality, they reshape it by defining success.",
-            "People adapt quickly to whatever is rewarded, even when it conflicts with intention.",
-            "This matters because money, status, and opportunity flow through these scoreboards.",
-            "The result is a quiet drift from values to outputs, from meaning to measurement.",
+            "Most people assume metrics reflect reality. They do not.",
+            "They shape reality by deciding what counts as success.",
+            "That matters because money, status, and jobs follow the scoreboard.",
+            "People adapt fast when rewards are on the line.",
+            "So the system starts changing people, not just measuring them.",
         ],
         "core_system": [
-            "Incentives work by narrowing attention to what gets counted and repeated.",
-            "Once a metric exists, people learn how to improve it, whether or not it helps.",
-            "Technology accelerates this feedback loop by making measurement constant.",
-            "Systems prefer signals that are easy to aggregate, even if they are shallow.",
-            "Psychology adds fuel: humans chase visible progress, especially under pressure.",
-            "When careers and budgets depend on a metric, it becomes the real goal.",
-            "This is how local optimization can quietly undermine the original mission.",
-            "The architecture looks rational, but it rewards strategic behavior over truth.",
-            "The more complex the system, the more people rely on proxies to decide.",
+            "Incentives narrow attention. That is their job.",
+            "Once a metric exists, people learn how to move it.",
+            "Technology speeds up that feedback loop.",
+            "Psychology adds pressure to chase visible progress.",
+            "If a career depends on a number, that number becomes the goal.",
+            "Local optimization feels rational, even when it breaks the mission.",
+            "The system rewards alignment with the metric, not the truth.",
         ],
         "big_picture": [
-            "Zooming out, incentives become a language that links psychology, money, and power.",
-            "Technology scales that language, making it harder to see the tradeoffs.",
-            "Society then reorganizes around what is legible to the system, not what is wise.",
-            "The deeper insight is that measurement is a political act, not a neutral one.",
+            "Zoom out and you can see the structure at work.",
+            "Psychology decides what people chase.",
+            "Money decides what gets scaled.",
+            "Technology decides what gets measured.",
+            "Society then reorganizes around what is legible to the system.",
         ],
         "closing": [
-            "A useful question is not how to win the game, but who wrote the rules.",
-            "If you change the incentive, you change the story the system tells itself.",
-            "That is why the most powerful shifts happen quietly, inside the metrics.",
+            "The quiet power is in the incentives, not the slogans.",
+            "Change the metric and you change the behavior.",
+            "That is where real system change begins.",
         ],
     }
 
@@ -152,54 +150,54 @@ def _section_templates() -> dict[str, list[str]]:
 def _axis_templates(axis: str) -> list[str]:
     templates = {
         "historical_evolution": [
-            "Historically, measurement expanded whenever organizations scaled beyond personal trust.",
-            "Early systems relied on judgment, but scale forced the creation of proxies.",
-            "Once proxy metrics appeared, they became the default language of authority.",
+            "History is full of moments where scale forced new measurements.",
+            "When trust breaks, metrics step in.",
+            "Over time the metric becomes the language of authority.",
         ],
         "incentive_structures": [
-            "Incentive structures decide who can win without changing the rules.",
-            "Those closest to the metric learn to shape it, while others bear the cost.",
-            "Rewards travel toward what is easiest to count, not what is most valuable.",
+            "Incentives decide who can win without changing the rules.",
+            "Those closest to the metric learn how to shape it.",
+            "Rewards travel toward what is easiest to count.",
         ],
         "failure_modes": [
-            "A common failure mode is Goodhart's Law: when a measure becomes a target, it stops being a measure.",
-            "Another failure mode is signaling inflation, where visible activity replaces meaningful outcomes.",
-            "Systems also fail by overfitting to past data and missing new risks.",
+            "One failure mode is Goodhart's Law.",
+            "When a measure becomes a target, it stops being a measure.",
+            "Another failure is signal inflation, where activity replaces outcomes.",
         ],
         "alternative_systems": [
-            "Alternative systems often rely on mixed signals, combining qualitative and quantitative inputs.",
-            "Some models slow down decision cycles to protect against metric manipulation.",
-            "Others decentralize authority to reduce the impact of any single metric.",
+            "Some systems slow decisions to protect judgment.",
+            "Others mix qualitative and quantitative signals.",
+            "Decentralized models can reduce single-metric dominance.",
         ],
         "psychological_biases": [
-            "Humans overweight what is recent and visible, which makes metrics feel more real than they are.",
-            "Status bias pushes people to protect the scoreboard, even when it becomes inaccurate.",
-            "Loss aversion encourages short-term metric defense over long-term system health.",
+            "We overweight what is recent and visible.",
+            "Status bias makes the scoreboard feel sacred.",
+            "Loss aversion pushes people to defend a bad metric.",
         ],
         "second_order_effects": [
-            "Second-order effects appear when people change behavior to satisfy the metric, not the mission.",
-            "Third-order effects appear when the system begins rewarding those changes as if they were success.",
-            "Eventually the system optimizes for appearances rather than outcomes.",
+            "Second-order effects appear when people chase the metric, not the mission.",
+            "The system then rewards those tactics as if they were success.",
+            "That shifts behavior even further away from intent.",
         ],
         "third_order_effects": [
-            "Third-order effects reshape culture, making compliance look like competence.",
-            "Over time, the system rewards those who master the signals, not the substance.",
-            "This creates a feedback loop that crowds out dissent and slows learning.",
+            "Third-order effects reshape culture.",
+            "Compliance starts to look like competence.",
+            "Learning slows because the signal gets too loud.",
         ],
         "long_term_consequences": [
-            "Over time, these incentives reshape culture and determine which skills are valued.",
-            "They also influence capital flows, reinforcing power structures that look efficient on paper.",
-            "The long-term cost is a slower ability to adapt when the environment changes.",
+            "Over time, incentives change which skills get rewarded.",
+            "Capital flows toward the most legible signals.",
+            "The long-term cost is slower adaptation.",
         ],
         "persistent_myths": [
             "A common myth is that more data always improves decisions.",
-            "Another myth is that metrics reduce bias, even though they often encode it.",
-            "People also assume that optimization equals progress, which is not always true.",
+            "Another myth is that metrics remove bias.",
+            "Optimization often just hides tradeoffs.",
         ],
         "why_misunderstood": [
-            "Intelligent people still misunderstand the system because the feedback is delayed and indirect.",
-            "The benefits are concentrated, while the harms are diffuse and harder to measure.",
-            "That makes the system feel stable even when it is drifting off course.",
+            "Smart people still miss this because the feedback is delayed.",
+            "The benefits are concentrated and the harms are diffuse.",
+            "So the system feels stable even when it drifts.",
         ],
     }
     return templates.get(axis, [])
@@ -255,28 +253,45 @@ def _phrase_pools() -> dict[str, list[str]]:
     }
 
 
-def _generate_sentences(section: str, target_words: int, used: set[str], axis: str | None = None) -> list[str]:
+def _sentence_similarity(candidate: str, existing: str) -> float:
+    candidate_tokens = set(candidate.lower().split())
+    existing_tokens = set(existing.lower().split())
+    if not candidate_tokens or not existing_tokens:
+        return 0.0
+    overlap = candidate_tokens.intersection(existing_tokens)
+    return len(overlap) / max(len(candidate_tokens), len(existing_tokens))
+
+
+def _is_repetitive(candidate: str, used: set[str]) -> bool:
+    for sentence in used:
+        if _sentence_similarity(candidate, sentence) >= 0.7:
+            return True
+    return False
+
+
+def _generate_sentences(section: str, target_words: int, used: set[str], axis: str | None = None, topic: str | None = None) -> list[str]:
     pools = _phrase_pools()
     templates = [
-        "{agent} inside {system} optimize for {metric} because it is visible and rewarded.",
-        "When {metric} becomes the scoreboard, it can {effect} across the whole system.",
-        "The system feels objective, yet it can {effect} in ways people rarely notice.",
-        "{agent} often chase {metric} to protect {stake}, even when it backfires later.",
-        "In complex {system}, proxies for {metric} become the fastest path to decisions.",
-        "What looks like progress can {effect} the feedback people depend on.",
-        "The system rewards alignment with {metric}, not alignment with the original mission.",
-        "This is why {system} can {effect} when incentives tighten under pressure.",
+        "{agent} inside {system} chase {metric} because it is the visible score.",
+        "When {metric} becomes the scoreboard, the system can {effect}.",
+        "The system feels objective, yet it can {effect} in quiet ways.",
+        "{agent} protect {stake} by pushing {metric}, even when it backfires.",
+        "In complex {system}, proxies for {metric} guide fast decisions.",
+        "What looks like progress can {effect} the signal people trust.",
+        "The system rewards the metric, not the mission.",
+        "When incentives tighten, {system} tend to {effect}.",
     ]
-    seed_sentences = _section_templates().get(section, [])
+    seed_sentences = _section_templates(topic or "the system").get(section, [])
     if axis:
         seed_sentences = seed_sentences + _axis_templates(axis)
     sentences = []
     word_count = 0
     for sentence in seed_sentences:
-        if sentence not in used:
-            sentences.append(sentence)
-            used.add(sentence)
-            word_count += len(sentence.split())
+        if sentence in used or _is_repetitive(sentence, used):
+            raise RuntimeError("Repetition detected in seed sentences.")
+        sentences.append(sentence)
+        used.add(sentence)
+        word_count += len(sentence.split())
     attempts = 0
     while word_count < target_words and attempts < 2000:
         template = random.choice(templates)
@@ -288,7 +303,7 @@ def _generate_sentences(section: str, target_words: int, used: set[str], axis: s
             stake=random.choice(pools["stakes"]),
         )
         attempts += 1
-        if sentence in used:
+        if sentence in used or _is_repetitive(sentence, used):
             continue
         used.add(sentence)
         sentences.append(sentence)
@@ -298,17 +313,40 @@ def _generate_sentences(section: str, target_words: int, used: set[str], axis: s
     return [_trim_line(line) for line in sentences]
 
 
-def _build_outline(topic: str, axes: list[str]) -> list[tuple[str, str | None, int]]:
+def _build_outline(axes: list[str]) -> list[tuple[str, str | None, int]]:
     return [
-        ("cold_open", None, 140),
-        ("problem_setup", None, 420),
-        ("core_system", None, 950),
+        ("cold_open", None, 160),
+        ("problem_setup", None, 460),
+        ("core_system", None, 1200),
         ("expansion_axis_a", axes[0], 260),
         ("expansion_axis_b", axes[1], 260),
         ("expansion_axis_c", axes[2], 260),
-        ("big_picture", None, 420),
-        ("closing", None, 150),
+        ("big_picture", None, 460),
+        ("closing", None, 160),
     ]
+
+
+def _insert_breaks(sentences: list[str]) -> list[str]:
+    output = []
+    count = 0
+    for sentence in sentences:
+        output.append(sentence)
+        count += 1
+        if count >= random.randint(1, 3):
+            output.append("")
+            count = 0
+    return output
+
+
+def _validate_no_repetition(lines: list[str]) -> None:
+    seen = []
+    for sentence in lines:
+        if not sentence.strip():
+            continue
+        for prior in seen:
+            if _sentence_similarity(sentence, prior) >= 0.7:
+                raise RuntimeError("Repetition detected in generated script.")
+        seen.append(sentence)
 
 
 def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
@@ -320,13 +358,12 @@ def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
     if len(axes) < 3:
         raise RuntimeError("Not enough expansion axes available for planning.")
 
-    outline = _build_outline(topic_plan["topic"], axes)
+    outline = _build_outline(axes)
     for section, axis, target_words in outline:
-        lines.extend(_generate_sentences(section, target_words, used, axis))
-        lines.append("")
+        sentences = _generate_sentences(section, target_words, used, axis, topic_plan["topic"])
+        lines.extend(_insert_breaks(sentences))
 
-    lines = [line for line in lines if line.strip()]
-    script = "\n".join(lines)
+    script = "\n".join(lines).strip()
     estimated_seconds = _estimate_seconds(script)
     word_count = len(script.split())
 
@@ -338,8 +375,9 @@ def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
         raise RuntimeError("Script exceeds maximum target word count.")
 
     lines = _truncate_lines(lines)
-    script = "\n".join(lines)
+    script = "\n".join(lines).strip()
     estimated_seconds = _estimate_seconds(script)
+    _validate_no_repetition(lines)
     return ScriptResult(text=script, estimated_seconds=estimated_seconds)
 
 

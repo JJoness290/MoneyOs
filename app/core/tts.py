@@ -1,13 +1,13 @@
 import asyncio
+import random
 import re
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
 import edge_tts
-from moviepy.editor import AudioFileClip, concatenate_audioclips
+from moviepy.editor import AudioClip, AudioFileClip, concatenate_audioclips
 
-from app.config import DEFAULT_VOICE, TTS_RATE
+from app.config import DEFAULT_VOICE
 
 
 @dataclass
@@ -18,31 +18,33 @@ class TTSResult:
     chunk_durations: list[float]
 
 
-def split_script_for_tts(text: str, max_chars: int = 800) -> list[str]:
-    """
-    Split on sentence boundaries.
-    Never split mid-sentence.
-    """
+def split_script_for_tts(text: str) -> list[str]:
     sentences = re.split(r"(?<=[.!?])\s+", text.strip())
     sentences = [sentence.strip() for sentence in sentences if sentence.strip()]
-    chunks: list[str] = []
-    current = ""
-    for sentence in sentences:
-        candidate = f"{current} {sentence}".strip() if current else sentence
-        if len(candidate) <= max_chars:
-            current = candidate
-            continue
-        if current:
-            chunks.append(current)
-        current = sentence
-    if current:
-        chunks.append(current)
-    return chunks
+    return sentences
 
 
-def _generate_chunk_audio(text: str, output_path: Path, voice: str) -> float:
+def _random_rate() -> str:
+    rate = random.uniform(0.95, 1.05)
+    percent = int(round((rate - 1.0) * 100))
+    sign = "+" if percent >= 0 else ""
+    return f"{sign}{percent}%"
+
+
+def _random_pitch() -> str:
+    percent = random.uniform(2.0, 4.0)
+    sign = random.choice(["+", "-"])
+    return f"{sign}{percent:.1f}%"
+
+
+def _generate_sentence_audio(text: str, output_path: Path, voice: str) -> float:
     async def _run() -> None:
-        communicate = edge_tts.Communicate(text, voice=voice, rate=TTS_RATE)
+        communicate = edge_tts.Communicate(
+            text,
+            voice=voice,
+            rate=_random_rate(),
+            pitch=_random_pitch(),
+        )
         await communicate.save(str(output_path))
 
     asyncio.run(_run())
@@ -55,34 +57,28 @@ def _generate_chunk_audio(text: str, output_path: Path, voice: str) -> float:
 
 
 def generate_tts(script_text: str, output_path: Path, voice: str = DEFAULT_VOICE) -> TTSResult:
-    """
-    Generates full audio from text in ONE pass.
-    Returns duration in seconds.
-    """
-    char_count = len(script_text)
-    max_safe_chars = 800
-    if char_count <= max_safe_chars:
-        chunks = [script_text]
-    else:
-        chunks = split_script_for_tts(script_text, max_chars=max_safe_chars)
+    sentences = split_script_for_tts(script_text)
+    if not sentences:
+        raise RuntimeError("Script text is empty after splitting.")
 
     chunk_paths: list[Path] = []
     chunk_durations: list[float] = []
-    for index, chunk in enumerate(chunks):
+    clips = []
+
+    for index, sentence in enumerate(sentences):
         chunk_path = output_path.with_name(f"{output_path.stem}_chunk{index}.mp3")
-        duration = _generate_chunk_audio(chunk, chunk_path, voice)
+        duration = _generate_sentence_audio(sentence, chunk_path, voice)
         chunk_paths.append(chunk_path)
         chunk_durations.append(duration)
+        clips.append(AudioFileClip(str(chunk_path)))
+        silence_duration = random.uniform(0.2, 0.4)
+        clips.append(AudioClip(lambda t: 0.0, duration=silence_duration, fps=44100))
 
-    if len(chunk_paths) == 1:
-        shutil.move(str(chunk_paths[0]), str(output_path))
-    else:
-        clips = [AudioFileClip(str(path)) for path in chunk_paths]
-        final_audio = concatenate_audioclips(clips)
-        final_audio.write_audiofile(str(output_path), logger=None)
-        final_audio.close()
-        for clip in clips:
-            clip.close()
+    final_audio = concatenate_audioclips(clips)
+    final_audio.write_audiofile(str(output_path), logger=None)
+    final_audio.close()
+    for clip in clips:
+        clip.close()
 
     final = AudioFileClip(str(output_path))
     final_duration = float(final.duration)
@@ -92,9 +88,13 @@ def generate_tts(script_text: str, output_path: Path, voice: str = DEFAULT_VOICE
     if output_path.stat().st_size < 100_000:
         raise RuntimeError("Generated audio file too small; likely failed TTS")
 
+    for path in chunk_paths:
+        if path.exists():
+            path.unlink()
+
     return TTSResult(
         audio_path=output_path,
         duration_seconds=final_duration,
-        chunk_count=len(chunks),
+        chunk_count=len(sentences),
         chunk_durations=chunk_durations,
     )
