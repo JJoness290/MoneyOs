@@ -1,13 +1,14 @@
 from dataclasses import dataclass
+import json
 import random
 from pathlib import Path
 from typing import Tuple
 
 import numpy as np
-from moviepy.editor import AudioFileClip, CompositeVideoClip, ImageClip, VideoFileClip, vfx
+from moviepy.editor import AudioFileClip, CompositeVideoClip, ImageClip, VideoFileClip
 from PIL import Image, ImageDraw, ImageFont
 
-from app.config import MINECRAFT_BG_DIR, TARGET_FPS, TARGET_RESOLUTION
+from app.config import MINECRAFT_BG_DIR, MINECRAFT_SOURCE_DIR, TARGET_FPS, TARGET_RESOLUTION
 
 
 @dataclass
@@ -31,18 +32,102 @@ def _fit_background(clip: VideoFileClip) -> VideoFileClip:
     )
 
 
-def _load_background(audio_duration: float) -> VideoFileClip:
+def _usage_path() -> Path:
+    return MINECRAFT_BG_DIR / ".usage.json"
+
+
+def _load_usage_history() -> list[str]:
+    path = _usage_path()
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+    if isinstance(data, list):
+        return [str(item) for item in data]
+    return []
+
+
+def _save_usage_history(history: list[str]) -> None:
+    _usage_path().write_text(json.dumps(history[-200:]), encoding="utf-8")
+
+
+def _slice_source_video(source_path: Path) -> list[Path]:
+    clips: list[Path] = []
+    with VideoFileClip(str(source_path)) as source_clip:
+        duration = float(source_clip.duration)
+        available = duration - 60
+        if available < 90:
+            raise RuntimeError(f"Source video too short for slicing: {source_path.name}")
+        clip_length = random.randint(90, min(180, int(available)))
+        start_max = duration - 30 - clip_length
+        if start_max <= 30:
+            raise RuntimeError(f"Source video too short for safe trimming: {source_path.name}")
+        start_time = random.uniform(30, start_max)
+        end_time = start_time + clip_length
+        sliced = source_clip.subclip(start_time, end_time).without_audio()
+        output_name = f"{source_path.stem}_{int(start_time)}_{int(clip_length)}.mp4"
+        output_path = MINECRAFT_BG_DIR / output_name
+        sliced.write_videofile(
+            str(output_path),
+            codec="libx264",
+            audio=False,
+            fps=TARGET_FPS,
+            threads=2,
+            preset="medium",
+            logger=None,
+        )
+        clips.append(output_path)
+    return clips
+
+
+def _ensure_background_clips() -> list[Path]:
     backgrounds = sorted(MINECRAFT_BG_DIR.glob("*.mp4"))
-    if not backgrounds:
-        raise RuntimeError("No Minecraft background videos found in assets/minecraft.")
-    bg_path = random.choice(backgrounds)
+    if backgrounds:
+        return backgrounds
+    sources = sorted(MINECRAFT_SOURCE_DIR.glob("*.mp4"))
+    if not sources:
+        raise RuntimeError("No Minecraft source videos found in assets/minecraft_source.")
+    generated: list[Path] = []
+    for source in sources:
+        generated.extend(_slice_source_video(source))
+    if not generated:
+        raise RuntimeError("No Minecraft background clips were generated.")
+    return generated
+
+
+def _select_background(backgrounds: list[Path]) -> Path:
+    if len(backgrounds) < 2:
+        raise RuntimeError("At least two Minecraft background clips are required to prevent reuse.")
+    history = _load_usage_history()
+    last_used = history[-1] if history else None
+    candidates = [path for path in backgrounds if str(path) != last_used]
+    if not candidates:
+        raise RuntimeError("Unable to select a non-repeating background clip.")
+
+    def usage_index(path: Path) -> int:
+        try:
+            return history.index(str(path))
+        except ValueError:
+            return -1
+
+    selected = min(candidates, key=usage_index)
+    if str(selected) in history:
+        history.remove(str(selected))
+    history.append(str(selected))
+    _save_usage_history(history)
+    return selected
+
+
+def _load_background(audio_duration: float) -> VideoFileClip:
+    backgrounds = _ensure_background_clips()
+    bg_path = _select_background(backgrounds)
     bg = VideoFileClip(str(bg_path)).without_audio()
     bg = _fit_background(bg)
-    if bg.duration >= audio_duration:
-        bg = bg.subclip(0, audio_duration)
-    else:
-        bg = bg.fx(vfx.loop, duration=audio_duration)
-    return bg
+    if bg.duration < audio_duration:
+        raise RuntimeError("Selected background clip is shorter than the audio duration.")
+    return bg.subclip(0, audio_duration)
 
 
 def _chunk_subtitles(text: str, min_words: int = 2, max_words: int = 6) -> list[str]:
@@ -125,25 +210,31 @@ def build_video(
     audio_path: Path,
     output_path: Path,
 ) -> VideoBuildResult:
-    with AudioFileClip(str(audio_path)) as audio_clip:
-        audio_duration = float(audio_clip.duration)
-        background = _load_background(audio_duration)
-        subtitle_clips = _build_subtitles(script_text, audio_duration)
-        layers = [background] + subtitle_clips
+    audio_clip = AudioFileClip(str(audio_path))
+    audio_duration = float(audio_clip.duration)
+    if audio_duration <= 0:
+        audio_clip.close()
+        raise RuntimeError("Audio duration is zero.")
+    background = _load_background(audio_duration)
+    subtitle_clips = _build_subtitles(script_text, audio_duration)
+    layers = [background] + subtitle_clips
 
-        final_video = CompositeVideoClip(layers, size=TARGET_RESOLUTION)
-        final_video = final_video.set_duration(audio_duration)
-        final_video = final_video.set_audio(audio_clip)
+    final_video = CompositeVideoClip(layers, size=TARGET_RESOLUTION)
+    final_video = final_video.set_duration(audio_duration)
+    final_video = final_video.set_audio(audio_clip)
 
-        final_video.write_videofile(
-            str(output_path),
-            codec="libx264",
-            audio_codec="aac",
-            fps=TARGET_FPS,
-            threads=4,
-            preset="medium",
-            temp_audiofile=str(output_path.with_suffix(".temp-audio.m4a")),
-            remove_temp=True,
-        )
+    final_video.write_videofile(
+        str(output_path),
+        codec="libx264",
+        audio_codec="aac",
+        fps=TARGET_FPS,
+        threads=4,
+        preset="medium",
+        temp_audiofile=str(output_path.with_suffix(".temp-audio.m4a")),
+        remove_temp=True,
+    )
 
-        return VideoBuildResult(output_path=output_path, duration_seconds=audio_duration)
+    background.close()
+    audio_clip.close()
+
+    return VideoBuildResult(output_path=output_path, duration_seconds=audio_duration)
