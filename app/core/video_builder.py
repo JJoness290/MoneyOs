@@ -4,7 +4,6 @@ import random
 from pathlib import Path
 from typing import Tuple
 
-import cv2
 import numpy as np
 from moviepy.editor import AudioFileClip, CompositeVideoClip, ImageClip, VideoClip
 from PIL import Image, ImageDraw, ImageFont
@@ -25,14 +24,9 @@ def _generate_platforms(seed: int, count: int, spacing: float) -> list[dict]:
         platforms.append(
             {
                 "offset": index * spacing,
-                "width": rng.uniform(0.3, 0.65),
-                "height": rng.uniform(0.03, 0.07),
-                "x": rng.uniform(-0.4, 0.4),
-                "color": (
-                    rng.randint(120, 220),
-                    rng.randint(120, 220),
-                    rng.randint(120, 220),
-                ),
+                "width": rng.uniform(0.35, 0.7),
+                "height": rng.uniform(0.04, 0.08),
+                "x": rng.uniform(-0.25, 0.25),
             }
         )
     return platforms
@@ -47,10 +41,20 @@ def _render_frame(
 ) -> np.ndarray:
     width, height = resolution
     frame = np.zeros((height, width, 3), dtype=np.uint8)
-    frame[:] = (18, 18, 22)
+
+    sky_top = np.array([24, 28, 46], dtype=np.uint8)
+    sky_bottom = np.array([12, 12, 20], dtype=np.uint8)
+    gradient = np.linspace(0, 1, height)[:, None]
+    sky = (sky_top * (1 - gradient) + sky_bottom * gradient).astype(np.uint8)
+    frame[:] = sky[:, None, :]
+
+    lane_width = int(width * 0.42)
+    lane_x1 = (width - lane_width) // 2
+    lane_x2 = lane_x1 + lane_width
+    frame[:, lane_x1:lane_x2] = (20, 22, 30)
 
     speed = loop_length / max(duration, 1.0)
-    bob = int(math.sin(t * 3.2) * 6)
+    bob = int(math.sin(t * 2.6) * 8)
 
     for platform in platforms:
         z = (platform["offset"] - t * speed) % loop_length
@@ -58,26 +62,27 @@ def _render_frame(
         perspective = 1.0 - depth
         if perspective <= 0:
             continue
-        y = int(height * 0.15 + (1 - depth) * height * 0.85) + bob
-        block_w = int(width * platform["width"] * (0.3 + 0.7 * perspective))
-        block_h = int(height * platform["height"] * (0.3 + 0.7 * perspective))
-        center_x = int(width * 0.5 + platform["x"] * width * 0.5)
-        x1 = max(0, center_x - block_w // 2)
-        x2 = min(width, center_x + block_w // 2)
+        y = int(height * 0.08 + (1 - depth) * height * 0.92) + bob
+        block_w = int(lane_width * platform["width"] * (0.2 + 0.8 * perspective))
+        block_h = int(height * platform["height"] * (0.2 + 0.8 * perspective))
+        center_x = int(width * 0.5 + platform["x"] * lane_width * 0.35)
+        x1 = max(lane_x1, center_x - block_w // 2)
+        x2 = min(lane_x2, center_x + block_w // 2)
         y1 = max(0, y - block_h // 2)
         y2 = min(height, y + block_h // 2)
-        color = platform["color"]
-        cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness=-1)
-        cv2.rectangle(frame, (x1, y1), (x2, y2), (10, 10, 10), thickness=2)
+        if y2 <= 0 or y1 >= height:
+            continue
+        frame[y1:y2, x1:x2] = (90, 95, 110)
+        frame[y1:y1 + 4, x1:x2] = (120, 125, 140)
 
     return frame
 
 
 def _procedural_background(duration: float) -> VideoClip:
     resolution = TARGET_RESOLUTION
-    loop_length = max(6.0, min(12.0, duration))
-    platform_count = 120
-    spacing = loop_length / 18
+    loop_length = max(8.0, min(14.0, duration))
+    platform_count = 140
+    spacing = loop_length / 20
     platforms = _generate_platforms(seed=42, count=platform_count, spacing=spacing)
 
     def make_frame(t: float) -> np.ndarray:
@@ -173,8 +178,8 @@ def build_video(
         layers = [background] + subtitle_clips
 
         final_video = CompositeVideoClip(layers, size=TARGET_RESOLUTION)
-        final_video = final_video.set_audio(audio_clip)
         final_video = final_video.set_duration(audio_duration)
+        final_video = final_video.set_audio(audio_clip)
 
         final_video.write_videofile(
             str(output_path),
