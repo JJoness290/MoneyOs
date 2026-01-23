@@ -8,7 +8,6 @@ from app.config import MIN_AUDIO_SECONDS
 WORDS_PER_SECOND = 2.2
 MAX_WORDS_PER_LINE = 12
 MAX_LINES = 120
-MAX_EXPANSION_PASSES = 2
 
 
 @dataclass
@@ -98,22 +97,6 @@ def _build_story_lines() -> list[str]:
     return [_trim_line(line) for line in base_lines]
 
 
-def _expand_story_lines() -> list[str]:
-    expansions = [
-        "I kept telling myself I was overreacting.",
-        "There were small pauses that felt heavy.",
-        "I felt uneasy, but I stayed quiet.",
-        "It got subtle, then it got loud.",
-        "I noticed how I was walking on eggshells.",
-        "I started replaying conversations in my head.",
-        "I felt anxious for no clear reason.",
-        "One day I realized I was always apologizing.",
-        "The pattern was obvious once I named it.",
-        "After that, I finally exhaled.",
-    ]
-    random.shuffle(expansions)
-    return [_trim_line(line) for line in expansions]
-
 def _truncate_lines(lines: list[str]) -> list[str]:
     if len(lines) <= MAX_LINES:
         return lines
@@ -121,23 +104,6 @@ def _truncate_lines(lines: list[str]) -> list[str]:
     while truncated and not truncated[-1].rstrip().endswith((".", "!", "?")):
         truncated.pop()
     return truncated or lines[:MAX_LINES]
-
-def _pad_recap(lines: list[str], max_lines: int) -> list[str]:
-    recap_lines = [
-        "I learned to trust the tension I felt.",
-        "Now I pay attention to the first uneasy moment.",
-        "It was a hard lesson, but it helped me reset.",
-        "I still think about how fast it shifted.",
-        "I try to listen to my own instincts now.",
-        "It changed how I handle similar situations.",
-    ]
-    for line in recap_lines:
-        if len(lines) >= max_lines:
-            break
-        if line not in lines:
-            lines.append(_trim_line(line))
-    return lines
-
 
 def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
     lines: list[str] = []
@@ -151,17 +117,6 @@ def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
     try:
         for line in _build_story_lines():
             add_unique(line)
-
-        passes = 0
-        while _estimate_seconds("\\n".join(lines)) < min_seconds and passes < MAX_EXPANSION_PASSES:
-            for line in _expand_story_lines():
-                if _estimate_seconds("\\n".join(lines)) >= min_seconds:
-                    break
-                add_unique(line)
-            passes += 1
-
-        if _estimate_seconds("\\n".join(lines)) < min_seconds:
-            lines = _pad_recap(lines, MAX_LINES)
 
         lines = _truncate_lines(lines)
         script = "\\n".join(lines)

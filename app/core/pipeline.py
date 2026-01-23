@@ -36,19 +36,9 @@ def run_pipeline(status_callback) -> PipelineResult:
     audio_path = _build_audio_path()
     tts_result = synthesize_speech(sanitized_script, audio_path)
 
-    if tts_result.duration_seconds < MIN_AUDIO_SECONDS:
-        status_callback("Generating script...")
-        script = generate_script(min_seconds=MIN_AUDIO_SECONDS + 10)
-        sanitized_script = sanitize_script(script.text)
-        tts_result = synthesize_speech(sanitized_script, audio_path)
-
     status_callback("Rendering video...")
     video_path = _build_video_path()
     video_result = build_video(sanitized_script, tts_result.audio_path, video_path)
-
-    if abs(video_result.duration_seconds - tts_result.duration_seconds) > 0.1:
-        status_callback("Rendering video...")
-        video_result = build_video(sanitized_script, tts_result.audio_path, video_path)
 
     status_callback("Done")
     return PipelineResult(script=script, tts=tts_result, video=video_result)
