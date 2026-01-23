@@ -128,3 +128,26 @@ def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
         script = "\\n".join(lines)
         estimated_seconds = _estimate_seconds(script) if script else 0.0
         return ScriptResult(text=script, estimated_seconds=estimated_seconds)
+
+
+def expand_script_once(script_text: str) -> ScriptResult:
+    expansion_lines = [
+        "Looking back, I wish I trusted the first uneasy feeling.",
+        "What I learned is that small red flags add up quickly.",
+        "If you are in something similar, pay attention to the tiny moments.",
+        "I wish I had asked myself why I felt tense all the time.",
+        "That experience changed how I notice patterns now.",
+        "It made me more honest about what I can tolerate.",
+    ]
+    existing = set(line.strip() for line in script_text.splitlines() if line.strip())
+    additions: list[str] = []
+    for line in expansion_lines:
+        if line not in existing:
+            additions.append(_trim_line(line))
+        if len(additions) >= 6:
+            break
+    expanded = "\\n".join([script_text] + additions)
+    expanded_lines = _truncate_lines(expanded.splitlines())
+    expanded_text = "\\n".join(expanded_lines)
+    estimated_seconds = _estimate_seconds(expanded_text)
+    return ScriptResult(text=expanded_text, estimated_seconds=estimated_seconds)
