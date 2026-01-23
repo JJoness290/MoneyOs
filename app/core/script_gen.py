@@ -130,14 +130,13 @@ def _beat_types() -> list[str]:
 
 def _short_sentences() -> list[str]:
     return [
-        "{name} hesitated.",
-        "It felt wrong in {location}.",
-        "{other} pulled back.",
-        "The {object} felt heavier.",
-        "It was about {detail}.",
-        "That was the first crack.",
-        "The room went quiet.",
-        "It hit harder than {name} expected.",
+        "{name} hesitated when {detail} came up.",
+        "It felt wrong in {location} after {detail}.",
+        "{other} pulled back once {detail} surfaced.",
+        "The {object} felt heavier because of {detail}.",
+        "That was the first crack in their plan.",
+        "The room went quiet when {other} mentioned {detail}.",
+        "It hit harder than {name} expected, mostly because of {detail}.",
     ]
 
 
@@ -310,11 +309,16 @@ def _sentence_from_beat(state: StoryState, beat: dict, used_sentences: list[str]
         state.last_template_key = key
         return sentence
 
-    _expand_world(state)
-    fallback = (
-        f"{beat['name']} introduced {state.add_character('ally')['name']} at {state.add_location()}, "
-        f"and the story took a new turn with {state.add_object()}."
-    )
+    for _ in range(4):
+        _expand_world(state)
+        fallback = (
+            f"{beat['name']} introduced {state.add_character('ally')['name']} at {state.add_location()}, "
+            f"and the story took a new turn with {state.add_object()} and {beat['detail']}."
+        )
+        if not _is_repetitive(fallback, used_sentences):
+            state.last_template_key = "fallback"
+            return fallback
+
     state.last_template_key = "fallback"
     return fallback
 

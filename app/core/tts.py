@@ -25,25 +25,38 @@ def split_script_for_tts(text: str) -> list[str]:
 
 
 def _random_rate() -> str:
-    rate = random.uniform(0.96, 1.04)
-    percent = int(round((rate - 1.0) * 100))
-    sign = "+" if percent >= 0 else ""
-    return f"{sign}{percent}%"
+    rate = random.uniform(0.97, 1.03)
+    return f"{rate:.2f}"
 
 
 def _random_pitch() -> str:
-    percent = random.uniform(0.1, 3.0)
-    sign = random.choice(["+", "-"])
-    return f"{sign}{percent:.1f}%"
+    if random.random() < 0.5:
+        semitone = random.choice([-1, 0, 1])
+        if semitone == 0:
+            return "0st"
+        sign = "+" if semitone > 0 else "-"
+        return f"{sign}{abs(semitone)}st"
+    multiplier = random.uniform(0.98, 1.02)
+    return f"{multiplier:.2f}"
 
 
-def _generate_sentence_audio(text: str, output_path: Path, voice: str) -> float:
+def _generate_sentence_audio(
+    text: str,
+    output_path: Path,
+    voice: str,
+    rate: str | None,
+    pitch: str | None,
+) -> float:
     async def _run() -> None:
+        settings: dict[str, str] = {}
+        if rate:
+            settings["rate"] = rate
+        if pitch:
+            settings["pitch"] = pitch
         communicate = edge_tts.Communicate(
             text,
             voice=voice,
-            rate=_random_rate(),
-            pitch=_random_pitch(),
+            **settings,
         )
         await communicate.save(str(output_path))
 
@@ -65,11 +78,38 @@ def generate_tts(script_text: str, output_path: Path, voice: str = DEFAULT_VOICE
 
     for index, sentence in enumerate(sentences):
         chunk_path = output_path.with_name(f"{output_path.stem}_chunk{index}.mp3")
-        duration = _generate_sentence_audio(sentence, chunk_path, voice)
-        chunk_paths.append(chunk_path)
-        chunk_durations.append(duration)
-        clips.append(AudioFileClip(str(chunk_path)))
-        silence_duration = random.uniform(0.2, 0.4)
+        duration = None
+        try:
+            duration = _generate_sentence_audio(
+                sentence,
+                chunk_path,
+                voice,
+                rate=_random_rate(),
+                pitch=_random_pitch(),
+            )
+        except Exception:
+            if chunk_path.exists():
+                chunk_path.unlink()
+            try:
+                duration = _generate_sentence_audio(
+                    sentence,
+                    chunk_path,
+                    voice,
+                    rate=None,
+                    pitch=None,
+                )
+            except Exception:
+                duration = None
+
+        if duration is not None and chunk_path.exists():
+            chunk_paths.append(chunk_path)
+            chunk_durations.append(duration)
+            clips.append(AudioFileClip(str(chunk_path)))
+        else:
+            fallback_duration = 0.3
+            chunk_durations.append(fallback_duration)
+            clips.append(AudioClip(lambda t: 0.0, duration=fallback_duration, fps=44100))
+        silence_duration = random.uniform(0.2, 0.35)
         clips.append(AudioClip(lambda t: 0.0, duration=silence_duration, fps=44100))
 
     final_audio = concatenate_audioclips(clips)
