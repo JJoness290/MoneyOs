@@ -5,12 +5,6 @@ from dataclasses import dataclass
 from app.config import MIN_AUDIO_SECONDS
 
 WORDS_PER_SECOND = 3.0
-MAX_WORDS_PER_LINE = 18
-MAX_LINES = 520
-MIN_TARGET_SECONDS = 600
-MIN_TARGET_WORDS = 2000
-MAX_TARGET_WORDS = 3000
-MAX_EXPANSION_PASSES = 0
 
 
 @dataclass
@@ -24,233 +18,11 @@ def _estimate_seconds(text: str) -> float:
     return word_count / WORDS_PER_SECOND
 
 
-def _trim_line(line: str) -> str:
-    words = line.split()
-    if len(words) <= MAX_WORDS_PER_LINE:
-        return line
-    return " ".join(words[:MAX_WORDS_PER_LINE])
-
-
 def sanitize_script(text: str) -> str:
     cleaned = re.sub(r"[#/\*_{}\[\]|><]", " ", text)
     cleaned = re.sub(r"`{1,3}.*?`{1,3}", " ", cleaned, flags=re.DOTALL)
     cleaned = re.sub(r"\s+", " ", cleaned)
     return cleaned.strip()
-
-
-def _truncate_lines(lines: list[str]) -> list[str]:
-    if len(lines) <= MAX_LINES:
-        return lines
-    truncated = lines[:MAX_LINES]
-    while truncated and not truncated[-1].rstrip().endswith((".", "!", "?")):
-        truncated.pop()
-    return truncated or lines[:MAX_LINES]
-
-
-def _expansion_axes() -> list[str]:
-    return [
-        "historical_evolution",
-        "incentive_structures",
-        "failure_modes",
-        "alternative_systems",
-        "psychological_biases",
-        "second_order_effects",
-        "third_order_effects",
-        "long_term_consequences",
-        "persistent_myths",
-        "why_misunderstood",
-    ]
-
-
-def _topic_pool() -> list[dict]:
-    return [
-        {
-            "topic": "how performance metrics reshape decisions inside modern institutions",
-            "axes": [
-                "historical_evolution",
-                "incentive_structures",
-                "failure_modes",
-                "psychological_biases",
-                "second_order_effects",
-            ],
-        },
-        {
-            "topic": "why algorithmic ranking systems reward the wrong behaviors",
-            "axes": [
-                "historical_evolution",
-                "incentive_structures",
-                "alternative_systems",
-                "third_order_effects",
-                "persistent_myths",
-            ],
-        },
-        {
-            "topic": "how financial incentives distort truth in knowledge platforms",
-            "axes": [
-                "historical_evolution",
-                "incentive_structures",
-                "failure_modes",
-                "psychological_biases",
-                "long_term_consequences",
-            ],
-        },
-    ]
-
-
-def _select_topic() -> dict:
-    topics = _topic_pool()
-    chosen = random.choice(topics)
-    available_axes = [axis for axis in chosen["axes"] if axis in _expansion_axes()]
-    if len(available_axes) < 4:
-        raise RuntimeError("Not enough expansion axes available for planning.")
-    chosen["axes"] = available_axes
-    return chosen
-
-
-def _section_templates(topic: str) -> dict[str, list[str]]:
-    return {
-        "cold_open": [
-            f"Here is the strange part about {topic}.",
-            "The numbers look clean, but the behavior gets messy.",
-            "We measure the wrong thing and then blame people for the outcome.",
-            "The real story is not who failed. It is what the system rewarded.",
-            "Once you see the incentives, the pattern becomes obvious.",
-        ],
-        "problem_setup": [
-            "Most people assume metrics reflect reality. They do not.",
-            "They shape reality by deciding what counts as success.",
-            "That matters because money, status, and jobs follow the scoreboard.",
-            "People adapt fast when rewards are on the line.",
-            "So the system starts changing people, not just measuring them.",
-        ],
-        "core_system": [
-            "Incentives narrow attention. That is their job.",
-            "Once a metric exists, people learn how to move it.",
-            "Technology speeds up that feedback loop.",
-            "Psychology adds pressure to chase visible progress.",
-            "If a career depends on a number, that number becomes the goal.",
-            "Local optimization feels rational, even when it breaks the mission.",
-            "The system rewards alignment with the metric, not the truth.",
-        ],
-        "big_picture": [
-            "Zoom out and you can see the structure at work.",
-            "Psychology decides what people chase.",
-            "Money decides what gets scaled.",
-            "Technology decides what gets measured.",
-            "Society then reorganizes around what is legible to the system.",
-        ],
-        "closing": [
-            "The quiet power is in the incentives, not the slogans.",
-            "Change the metric and you change the behavior.",
-            "That is where real system change begins.",
-        ],
-    }
-
-
-def _axis_templates(axis: str) -> list[str]:
-    templates = {
-        "historical_evolution": [
-            "History is full of moments where scale forced new measurements.",
-            "When trust breaks, metrics step in.",
-            "Over time the metric becomes the language of authority.",
-        ],
-        "incentive_structures": [
-            "Incentives decide who can win without changing the rules.",
-            "Those closest to the metric learn how to shape it.",
-            "Rewards travel toward what is easiest to count.",
-        ],
-        "failure_modes": [
-            "One failure mode is Goodhart's Law.",
-            "When a measure becomes a target, it stops being a measure.",
-            "Another failure is signal inflation, where activity replaces outcomes.",
-        ],
-        "alternative_systems": [
-            "Some systems slow decisions to protect judgment.",
-            "Others mix qualitative and quantitative signals.",
-            "Decentralized models can reduce single-metric dominance.",
-        ],
-        "psychological_biases": [
-            "We overweight what is recent and visible.",
-            "Status bias makes the scoreboard feel sacred.",
-            "Loss aversion pushes people to defend a bad metric.",
-        ],
-        "second_order_effects": [
-            "Second-order effects appear when people chase the metric, not the mission.",
-            "The system then rewards those tactics as if they were success.",
-            "That shifts behavior even further away from intent.",
-        ],
-        "third_order_effects": [
-            "Third-order effects reshape culture.",
-            "Compliance starts to look like competence.",
-            "Learning slows because the signal gets too loud.",
-        ],
-        "long_term_consequences": [
-            "Over time, incentives change which skills get rewarded.",
-            "Capital flows toward the most legible signals.",
-            "The long-term cost is slower adaptation.",
-        ],
-        "persistent_myths": [
-            "A common myth is that more data always improves decisions.",
-            "Another myth is that metrics remove bias.",
-            "Optimization often just hides tradeoffs.",
-        ],
-        "why_misunderstood": [
-            "Smart people still miss this because the feedback is delayed.",
-            "The benefits are concentrated and the harms are diffuse.",
-            "So the system feels stable even when it drifts.",
-        ],
-    }
-    return templates.get(axis, [])
-
-
-def _phrase_pools() -> dict[str, list[str]]:
-    return {
-        "agents": [
-            "managers",
-            "platform designers",
-            "policy teams",
-            "investors",
-            "operators",
-            "engineers",
-            "frontline workers",
-            "regulators",
-        ],
-        "systems": [
-            "platforms",
-            "markets",
-            "institutions",
-            "organizations",
-            "algorithms",
-            "workflows",
-            "rating systems",
-        ],
-        "metrics": [
-            "engagement",
-            "productivity",
-            "compliance",
-            "growth",
-            "risk",
-            "output",
-            "efficiency",
-        ],
-        "effects": [
-            "distort judgment",
-            "change behavior",
-            "compress nuance",
-            "reward shortcuts",
-            "shift incentives",
-            "redefine success",
-            "hide tradeoffs",
-        ],
-        "stakes": [
-            "capital allocation",
-            "status hierarchies",
-            "career mobility",
-            "public trust",
-            "social legitimacy",
-            "strategic advantage",
-        ],
-    }
 
 
 def _sentence_similarity(candidate: str, existing: str) -> float:
@@ -262,137 +34,347 @@ def _sentence_similarity(candidate: str, existing: str) -> float:
     return len(overlap) / max(len(candidate_tokens), len(existing_tokens))
 
 
-def _is_repetitive(candidate: str, used: set[str]) -> bool:
-    for sentence in used:
-        if _sentence_similarity(candidate, sentence) >= 0.7:
-            return True
-    return False
+def _is_repetitive(candidate: str, used: list[str]) -> bool:
+    return any(_sentence_similarity(candidate, prior) >= 0.6 for prior in used)
 
 
-def _generate_sentences(section: str, target_words: int, used: set[str], axis: str | None = None, topic: str | None = None) -> list[str]:
-    pools = _phrase_pools()
-    templates = [
-        "{agent} inside {system} chase {metric} because it is the visible score.",
-        "When {metric} becomes the scoreboard, the system can {effect}.",
-        "The system feels objective, yet it can {effect} in quiet ways.",
-        "{agent} protect {stake} by pushing {metric}, even when it backfires.",
-        "In complex {system}, proxies for {metric} guide fast decisions.",
-        "What looks like progress can {effect} the signal people trust.",
-        "The system rewards the metric, not the mission.",
-        "When incentives tighten, {system} tend to {effect}.",
-    ]
-    seed_sentences = _section_templates(topic or "the system").get(section, [])
-    if axis:
-        seed_sentences = seed_sentences + _axis_templates(axis)
-    sentences = []
-    word_count = 0
-    for sentence in seed_sentences:
-        if sentence in used or _is_repetitive(sentence, used):
-            raise RuntimeError("Repetition detected in seed sentences.")
-        sentences.append(sentence)
-        used.add(sentence)
-        word_count += len(sentence.split())
-    attempts = 0
-    while word_count < target_words and attempts < 2000:
-        template = random.choice(templates)
-        sentence = template.format(
-            agent=random.choice(pools["agents"]),
-            system=random.choice(pools["systems"]),
-            metric=random.choice(pools["metrics"]),
-            effect=random.choice(pools["effects"]),
-            stake=random.choice(pools["stakes"]),
-        )
-        attempts += 1
-        if sentence in used or _is_repetitive(sentence, used):
-            continue
-        used.add(sentence)
-        sentences.append(sentence)
-        word_count += len(sentence.split())
-    if word_count < target_words:
-        raise RuntimeError("Unable to generate enough unique sentences for section.")
-    return [_trim_line(line) for line in sentences]
+def _pick_unique(options: list[str], used: set[str]) -> str:
+    choices = [option for option in options if option not in used]
+    if not choices:
+        return random.choice(options)
+    choice = random.choice(choices)
+    used.add(choice)
+    return choice
 
 
-def _build_outline(axes: list[str]) -> list[tuple[str, str | None, int]]:
+def _name_pool() -> list[str]:
     return [
-        ("cold_open", None, 160),
-        ("problem_setup", None, 460),
-        ("core_system", None, 1200),
-        ("expansion_axis_a", axes[0], 260),
-        ("expansion_axis_b", axes[1], 260),
-        ("expansion_axis_c", axes[2], 260),
-        ("big_picture", None, 460),
-        ("closing", None, 160),
+        "Mara",
+        "Eli",
+        "Jonah",
+        "Priya",
+        "Tess",
+        "Owen",
+        "Nina",
+        "Caleb",
+        "Rue",
+        "Samir",
+        "Lena",
+        "Jo",
+        "Kian",
+        "Milo",
+        "Anya",
+        "Inez",
+        "Mateo",
     ]
 
 
-def _insert_breaks(sentences: list[str]) -> list[str]:
-    output = []
-    count = 0
-    for sentence in sentences:
-        output.append(sentence)
-        count += 1
-        if count >= random.randint(1, 3):
-            output.append("")
-            count = 0
-    return output
+def _location_pool() -> list[str]:
+    return [
+        "the quiet riverfront",
+        "a sun-baked bus depot",
+        "the worn lobby of a tech co-op",
+        "a closed diner with flickering neon",
+        "the third floor of a public library",
+        "a crowded night market",
+        "an old workshop behind a corner store",
+        "the rooftop of a parking garage",
+        "a narrow alley lined with murals",
+        "the back room of a community center",
+    ]
 
 
-def _validate_no_repetition(lines: list[str]) -> None:
-    seen = []
-    for sentence in lines:
-        if not sentence.strip():
+def _object_pool() -> list[str]:
+    return [
+        "a ledger with torn pages",
+        "a dented phone",
+        "a thrifted backpack",
+        "a keycard with a smudged logo",
+        "a crumpled map",
+        "a chipped mug",
+        "a photo booth strip",
+        "a folded note",
+        "a scratched flash drive",
+        "a taped-up badge",
+    ]
+
+
+def _traits_pool() -> list[str]:
+    return [
+        "restless",
+        "careful",
+        "soft-spoken",
+        "blunt",
+        "curious",
+        "skeptical",
+        "warm",
+        "stubborn",
+        "observant",
+        "tired but kind",
+    ]
+
+
+def _beat_types() -> list[str]:
+    return [
+        "setup",
+        "inciting",
+        "complication",
+        "pressure",
+        "reveal",
+        "consequence",
+        "turn",
+        "resolution",
+        "aftermath",
+    ]
+
+
+def _short_sentences() -> list[str]:
+    return [
+        "{name} hesitated.",
+        "It felt wrong in {location}.",
+        "{other} pulled back.",
+        "The {object} felt heavier.",
+        "It was about {detail}.",
+        "That was the first crack.",
+        "The room went quiet.",
+        "It hit harder than {name} expected.",
+    ]
+
+
+def _medium_templates() -> list[str]:
+    return [
+        "{name} found {object} near {location}, and it shifted the day.",
+        "{name} stepped into {location} and felt the mood change.",
+        "{name} trusted {other}, even though {other} looked unsure.",
+        "{name} kept {object} close, like it might explain everything.",
+        "{name} heard the rumor again at {location}, and it sounded different.",
+        "{name} watched {other} hesitate, then made a choice.",
+        "{name} noticed how {location} was emptier than usual.",
+        "{name} promised to fix it, not because it was easy, but because it mattered.",
+        "{name} told {other} the truth, and it landed like a weight.",
+        "{name} admitted {detail}, and {other} didn't argue.",
+    ]
+
+
+def _long_templates() -> list[str]:
+    return [
+        "When {name} finally met {other} at {location}, the whole story shifted, because {object} was not a clue, it was a warning.",
+        "{name} followed the trail back through {location}, and the people there filled in the missing hours one by one.",
+        "{other} admitted the plan had failed, and {name} realized the mistake had been theirs from the start.",
+        "By the time {name} opened {object}, {other} had already disappeared, leaving only a choice and a mess.",
+        "{name} remembered the first time they walked into {location}, and how the promise they made back then now felt dangerous.",
+        "The mistake was not just the decision, it was the silence after it, and {name} could feel the cost growing.",
+        "{name} kept the secret too long, and when {other} found out at {location}, nothing about their friendship was the same.",
+        "The trouble started with {detail}, and {name} could feel the fallout spreading.",
+    ]
+
+
+class StoryState:
+    def __init__(self, topic: str) -> None:
+        self.topic = topic
+        self.used_names: set[str] = set()
+        self.used_locations: set[str] = set()
+        self.used_objects: set[str] = set()
+        self.characters: list[dict] = []
+        self.locations: list[str] = []
+        self.objects: list[str] = []
+        self.beat_index = 0
+        self.phase = "setup"
+        self.last_template_key: str | None = None
+
+    def add_character(self, role: str) -> dict:
+        name = _pick_unique(_name_pool(), self.used_names)
+        trait = _pick_unique(_traits_pool(), set())
+        character = {"name": name, "role": role, "trait": trait}
+        self.characters.append(character)
+        return character
+
+    def add_location(self) -> str:
+        location = _pick_unique(_location_pool(), self.used_locations)
+        self.locations.append(location)
+        return location
+
+    def add_object(self) -> str:
+        obj = _pick_unique(_object_pool(), self.used_objects)
+        self.objects.append(obj)
+        return obj
+
+
+def _init_story(topic: str) -> StoryState:
+    state = StoryState(topic)
+    state.add_character("protagonist")
+    state.add_character("friend")
+    state.add_location()
+    state.add_object()
+    return state
+
+
+def _advance_phase(state: StoryState) -> None:
+    phase_order = ["setup", "tension", "reveal", "conclusion"]
+    current_index = phase_order.index(state.phase)
+    if current_index < len(phase_order) - 1:
+        state.phase = phase_order[current_index + 1]
+
+
+def _expand_world(state: StoryState) -> None:
+    if len(state.characters) < 6 and random.random() < 0.6:
+        state.add_character("new")
+    if len(state.locations) < 8 and random.random() < 0.7:
+        state.add_location()
+    if len(state.objects) < 8 and random.random() < 0.5:
+        state.add_object()
+
+
+def _build_beat(state: StoryState) -> dict:
+    beat_type = random.choice(_beat_types())
+    if state.phase == "setup":
+        beat_type = random.choice(["setup", "inciting"])
+    elif state.phase == "tension":
+        beat_type = random.choice(["complication", "pressure", "turn"])
+    elif state.phase == "reveal":
+        beat_type = random.choice(["reveal", "consequence", "turn"])
+    else:
+        beat_type = random.choice(["resolution", "aftermath"]) 
+
+    if random.random() < 0.25:
+        _expand_world(state)
+
+    character = random.choice(state.characters)
+    other = random.choice([c for c in state.characters if c != character])
+    location = random.choice(state.locations) if state.locations else state.add_location()
+    obj = random.choice(state.objects) if state.objects else state.add_object()
+    beat = {
+        "type": beat_type,
+        "name": character["name"],
+        "other": other["name"],
+        "location": location,
+        "object": obj,
+        "detail": random.choice(
+            [
+                "a promise that felt heavier than it sounded",
+                "a plan that slipped out of control",
+                "a secret nobody wanted to carry",
+                "a sudden risk that had no easy exit",
+                "a quiet warning that went ignored",
+                "a rumor with too much truth in it",
+                "a fragile truce that could snap",
+            ]
+        ),
+    }
+    state.beat_index += 1
+    if state.beat_index % 12 == 0:
+        _advance_phase(state)
+    return beat
+
+
+def _sentence_from_beat(state: StoryState, beat: dict, used_sentences: list[str]) -> str:
+    attempts = 0
+    while attempts < 50:
+        length_choice = random.random()
+        if length_choice < 0.2:
+            template = random.choice(_short_sentences())
+            sentence = template.format(
+                name=beat["name"],
+                other=beat["other"],
+                location=beat["location"],
+                object=beat["object"],
+                detail=beat["detail"],
+            )
+            key = "short"
+        elif length_choice < 0.65:
+            template = random.choice(_medium_templates())
+            sentence = template.format(
+                name=beat["name"],
+                other=beat["other"],
+                location=beat["location"],
+                object=beat["object"],
+                detail=beat["detail"],
+            )
+            key = "medium"
+        else:
+            template = random.choice(_long_templates())
+            sentence = template.format(
+                name=beat["name"],
+                other=beat["other"],
+                location=beat["location"],
+                object=beat["object"],
+                detail=beat["detail"],
+            )
+            key = "long"
+
+        attempts += 1
+        if state.last_template_key == key:
             continue
-        for prior in seen:
-            if _sentence_similarity(sentence, prior) >= 0.7:
-                raise RuntimeError("Repetition detected in generated script.")
-        seen.append(sentence)
+        if _is_repetitive(sentence, used_sentences):
+            continue
+        state.last_template_key = key
+        return sentence
+
+    _expand_world(state)
+    fallback = (
+        f"{beat['name']} introduced {state.add_character('ally')['name']} at {state.add_location()}, "
+        f"and the story took a new turn with {state.add_object()}."
+    )
+    state.last_template_key = "fallback"
+    return fallback
+
+
+def _story_seed(topic: str) -> list[str]:
+    return [
+        f"There is a story about {topic}, but it starts with a small moment.",
+        "The kind you almost skip past.",
+    ]
 
 
 def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
+    topic = random.choice(
+        [
+            "a city project that went quiet overnight",
+            "a neighborhood app that suddenly turned sour",
+            "a public promise that kept slipping",
+            "a tiny startup that made a giant mistake",
+            "a group of friends caught in a slow, messy change",
+        ]
+    )
+    state = _init_story(topic)
+    used_sentences: list[str] = []
     lines: list[str] = []
-    used = set()
 
-    topic_plan = _select_topic()
-    axes = topic_plan["axes"]
-    if len(axes) < 3:
-        raise RuntimeError("Not enough expansion axes available for planning.")
+    for seed in _story_seed(topic):
+        lines.append(seed)
+        used_sentences.append(seed)
 
-    outline = _build_outline(axes)
-    for section, axis, target_words in outline:
-        sentences = _generate_sentences(section, target_words, used, axis, topic_plan["topic"])
-        lines.extend(_insert_breaks(sentences))
+    while _estimate_seconds(" ".join(lines)) < float(min_seconds):
+        beat = _build_beat(state)
+        sentence = _sentence_from_beat(state, beat, used_sentences)
+        used_sentences.append(sentence)
+        lines.append(sentence)
+
+        if random.random() < 0.25:
+            follow_up = _sentence_from_beat(state, beat, used_sentences)
+            used_sentences.append(follow_up)
+            lines.append(follow_up)
+
+        if random.random() < 0.1:
+            lines.append("")
 
     script = "\n".join(lines).strip()
-    estimated_seconds = _estimate_seconds(script)
-    word_count = len(script.split())
-
-    if estimated_seconds < MIN_TARGET_SECONDS:
-        raise RuntimeError("Script too short after initial planning.")
-    if word_count < MIN_TARGET_WORDS:
-        raise RuntimeError("Script word count below minimum target.")
-    if word_count > MAX_TARGET_WORDS:
-        raise RuntimeError("Script exceeds maximum target word count.")
-
-    lines = _truncate_lines(lines)
-    script = "\n".join(lines).strip()
-    estimated_seconds = _estimate_seconds(script)
-    _validate_no_repetition(lines)
-    return ScriptResult(text=script, estimated_seconds=estimated_seconds)
+    script = sanitize_script(script)
+    return ScriptResult(text=script, estimated_seconds=_estimate_seconds(script))
 
 
 def expand_script_once(script_text: str) -> ScriptResult:
-    raise RuntimeError("Script expansion after planning is disabled.")
+    return ScriptResult(text=script_text, estimated_seconds=_estimate_seconds(script_text))
 
 
 def generate_titles(script_text: str) -> list[str]:
     titles = [
-        "Why This System Rewards the Wrong People",
-        "The Hidden Logic Behind Modern Work",
-        "This Incentive Quietly Changed Everything",
-        "How Metrics Became a Form of Power",
-        "The Psychological Cost of Incentive Design",
-        "What Technology Counts, Society Becomes",
+        "The Small Moment That Changed Everything",
+        "A Story About Trust, Pressure, and One Wrong Move",
+        "The Night the Plan Slipped Away",
+        "How a Quiet Promise Became a Mess",
+        "The Story No One Wanted to Tell",
+        "What Really Happened After the Warning",
     ]
     random.shuffle(titles)
     return titles[:3]
@@ -400,7 +382,7 @@ def generate_titles(script_text: str) -> list[str]:
 
 def generate_description(script_text: str) -> str:
     return (
-        "A clear explanation of how incentives, technology, and psychology shape "
-        "modern systems, why metrics become power, and what second-order effects "
-        "emerge when organizations optimize for the wrong signals."
+        "A calm, conversational story with a clear beginning, rising tension, "
+        "a reveal, and a grounded ending, told like a real person walking you "
+        "through what happened and why it mattered."
     )

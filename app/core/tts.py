@@ -25,14 +25,14 @@ def split_script_for_tts(text: str) -> list[str]:
 
 
 def _random_rate() -> str:
-    rate = random.uniform(0.95, 1.05)
+    rate = random.uniform(0.96, 1.04)
     percent = int(round((rate - 1.0) * 100))
     sign = "+" if percent >= 0 else ""
     return f"{sign}{percent}%"
 
 
 def _random_pitch() -> str:
-    percent = random.uniform(2.0, 4.0)
+    percent = random.uniform(0.1, 3.0)
     sign = random.choice(["+", "-"])
     return f"{sign}{percent:.1f}%"
 
@@ -51,8 +51,6 @@ def _generate_sentence_audio(text: str, output_path: Path, voice: str) -> float:
     audio = AudioFileClip(str(output_path))
     duration = float(audio.duration)
     audio.close()
-    if duration <= 1:
-        raise RuntimeError("Generated audio chunk is too short or invalid")
     return duration
 
 
@@ -83,11 +81,6 @@ def generate_tts(script_text: str, output_path: Path, voice: str = DEFAULT_VOICE
     final = AudioFileClip(str(output_path))
     final_duration = float(final.duration)
     final.close()
-    if final_duration < 5:
-        raise RuntimeError("Generated audio too short to be valid")
-    if output_path.stat().st_size < 100_000:
-        raise RuntimeError("Generated audio file too small; likely failed TTS")
-
     for path in chunk_paths:
         if path.exists():
             path.unlink()
