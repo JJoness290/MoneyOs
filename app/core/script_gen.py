@@ -1,5 +1,6 @@
 import logging
 import random
+import re
 from dataclasses import dataclass
 
 from app.config import MIN_AUDIO_SECONDS
@@ -26,6 +27,13 @@ def _trim_line(line: str) -> str:
     if len(words) <= MAX_WORDS_PER_LINE:
         return line
     return " ".join(words[:MAX_WORDS_PER_LINE])
+
+
+def sanitize_script(text: str) -> str:
+    cleaned = re.sub(r"[#/\\\\*_{}\\[\\]|><]", " ", text)
+    cleaned = re.sub(r"`{1,3}.*?`{1,3}", " ", cleaned, flags=re.DOTALL)
+    cleaned = re.sub(r"\\s+", " ", cleaned)
+    return cleaned.strip()
 
 
 def _story_theme() -> str:
