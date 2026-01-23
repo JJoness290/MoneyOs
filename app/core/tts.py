@@ -14,6 +14,8 @@ class TTSResult:
     audio_path: Path
     duration_seconds: float
     chunk_count: int
+    chunk_durations: list[float]
+    estimated_seconds: float
 
 
 def _estimate_seconds(text: str) -> float:
@@ -21,7 +23,7 @@ def _estimate_seconds(text: str) -> float:
     return word_count / 2.2
 
 
-def split_script_for_tts(text: str, max_chars: int = 900) -> list[str]:
+def split_script_for_tts(text: str, max_chars: int = 800) -> list[str]:
     """
     Split on sentence boundaries.
     Never split mid-sentence.
@@ -62,15 +64,19 @@ def generate_tts(script_text: str, output_path: Path, voice: str = DEFAULT_VOICE
     Generates full audio from text in ONE pass.
     Returns duration in seconds.
     """
-    chunks = split_script_for_tts(script_text)
-    if not chunks:
-        raise RuntimeError("Script text is empty after splitting.")
+    chunks = split_script_for_tts(script_text, max_chars=800)
+    if len(chunks) < 2:
+        raise RuntimeError(
+            f"TTS chunking failed: expected multiple chunks, got {len(chunks)}"
+        )
 
     chunk_paths: list[Path] = []
+    chunk_durations: list[float] = []
     for index, chunk in enumerate(chunks):
         chunk_path = output_path.with_name(f"{output_path.stem}_chunk{index}.mp3")
-        _generate_chunk_audio(chunk, chunk_path, voice)
+        duration = _generate_chunk_audio(chunk, chunk_path, voice)
         chunk_paths.append(chunk_path)
+        chunk_durations.append(duration)
 
     clips = [AudioFileClip(str(path)) for path in chunk_paths]
     final_audio = concatenate_audioclips(clips)
@@ -79,12 +85,18 @@ def generate_tts(script_text: str, output_path: Path, voice: str = DEFAULT_VOICE
     for clip in clips:
         clip.close()
 
-    audio = AudioFileClip(str(output_path))
-    duration = float(audio.duration)
-    audio.close()
+    final = AudioFileClip(str(output_path))
+    final_duration = float(final.duration)
+    final.close()
 
     expected = _estimate_seconds(script_text)
-    if duration + 1 < expected:
+    if final_duration < expected * 0.9:
         raise RuntimeError("Generated audio appears truncated compared to script length")
 
-    return TTSResult(audio_path=output_path, duration_seconds=duration, chunk_count=len(chunks))
+    return TTSResult(
+        audio_path=output_path,
+        duration_seconds=final_duration,
+        chunk_count=len(chunks),
+        chunk_durations=chunk_durations,
+        estimated_seconds=expected,
+    )

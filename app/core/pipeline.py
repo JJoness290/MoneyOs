@@ -38,7 +38,10 @@ def run_pipeline(status_callback) -> PipelineResult:
     audio_path = _build_audio_path()
     tts_result = generate_tts(sanitized_script, audio_path)
     status_callback(
-        f"TTS chunks: {tts_result.chunk_count}, audio: {tts_result.duration_seconds:.2f}s"
+        "TTS chunks="
+        f"{tts_result.chunk_count} | chunk_durations={tts_result.chunk_durations} | "
+        f"final_audio={tts_result.duration_seconds:.2f}s | "
+        f"estimated={tts_result.estimated_seconds:.2f}s"
     )
     if tts_result.duration_seconds < MIN_AUDIO_SECONDS:
         raise RuntimeError("Generated audio is shorter than 60 seconds.")
