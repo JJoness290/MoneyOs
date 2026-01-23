@@ -23,6 +23,12 @@ _jobs_lock = threading.Lock()
 _jobs: Dict[str, dict] = {}
 
 
+def _format_mmss(seconds: float) -> str:
+    total_seconds = int(round(seconds))
+    minutes, secs = divmod(total_seconds, 60)
+    return f"{minutes:02d}:{secs:02d}"
+
+
 def _set_status(job_id: str, status: str, result: Optional[PipelineResult] = None) -> None:
     with _jobs_lock:
         payload = _jobs.setdefault(job_id, {"status": STATUS_IDLE})
@@ -30,6 +36,12 @@ def _set_status(job_id: str, status: str, result: Optional[PipelineResult] = Non
         if result:
             payload["video_path"] = str(result.video.output_path.resolve())
             payload["duration"] = result.video.duration_seconds
+            payload["duration_mmss"] = _format_mmss(result.video.duration_seconds)
+            payload["audio_duration"] = result.tts.duration_seconds
+            payload["audio_duration_mmss"] = _format_mmss(result.tts.duration_seconds)
+            payload["word_count"] = result.word_count
+            payload["titles"] = result.titles
+            payload["description"] = result.description
             payload["success"] = True
 
 

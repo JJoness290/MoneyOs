@@ -7,11 +7,11 @@ from app.config import MIN_AUDIO_SECONDS
 
 WORDS_PER_SECOND = 3.0
 MAX_WORDS_PER_LINE = 12
-MAX_LINES = 400
-MIN_TARGET_SECONDS = 80
+MAX_LINES = 500
+MIN_TARGET_SECONDS = 720
 MIN_TARGET_WORDS = 2200
 MAX_TARGET_WORDS = 3000
-MAX_EXPANSION_PASSES = 4
+MAX_EXPANSION_PASSES = 3
 EXPANSION_MIN_WORDS = 200
 EXPANSION_MAX_WORDS = 250
 
@@ -199,26 +199,123 @@ def _generate_sentences(section: str, target_words: int, used: set[str]) -> list
         raise RuntimeError("Unable to generate enough unique sentences for section.")
     return [_trim_line(line) for line in sentences]
 
+def _expansion_axes() -> list[str]:
+    return [
+        "historical_context",
+        "incentive_structures",
+        "failure_modes",
+        "alternative_systems",
+        "psychological_biases",
+        "second_order_effects",
+        "long_term_implications",
+        "common_myths",
+        "why_misunderstood",
+    ]
 
-def _build_expansion_block(used_sentences: set[str]) -> list[str]:
-    sentences = _generate_sentences("system_explanation", EXPANSION_MIN_WORDS, used_sentences)
-    words = 0
+
+def _axis_templates(axis: str) -> list[str]:
+    templates = {
+        "historical_context": [
+            "Historically, measurement expanded whenever organizations scaled beyond personal trust.",
+            "Early systems relied on judgment, but scale forced the creation of proxies.",
+            "Once proxy metrics appeared, they became the default language of authority.",
+        ],
+        "incentive_structures": [
+            "Incentive structures decide who can win without changing the rules.",
+            "Those closest to the metric learn to shape it, while others bear the cost.",
+            "Rewards travel toward what is easiest to count, not what is most valuable.",
+        ],
+        "failure_modes": [
+            "A common failure mode is Goodhart's Law: when a measure becomes a target, it stops being a measure.",
+            "Another failure mode is signaling inflation, where visible activity replaces meaningful outcomes.",
+            "Systems also fail by overfitting to past data and missing new risks.",
+        ],
+        "alternative_systems": [
+            "Alternative systems often rely on mixed signals, combining qualitative and quantitative inputs.",
+            "Some models slow down decision cycles to protect against metric manipulation.",
+            "Others decentralize authority to reduce the impact of any single metric.",
+        ],
+        "psychological_biases": [
+            "Humans overweight what is recent and visible, which makes metrics feel more real than they are.",
+            "Status bias pushes people to protect the scoreboard, even when it becomes inaccurate.",
+            "Loss aversion encourages short-term metric defense over long-term system health.",
+        ],
+        "second_order_effects": [
+            "Second-order effects appear when people change behavior to satisfy the metric, not the mission.",
+            "Third-order effects appear when the system begins rewarding those changes as if they were success.",
+            "Eventually the system optimizes for appearances rather than outcomes.",
+        ],
+        "long_term_implications": [
+            "Over time, these incentives reshape culture and determine which skills are valued.",
+            "They also influence capital flows, reinforcing power structures that look efficient on paper.",
+            "The long-term cost is a slower ability to adapt when the environment changes.",
+        ],
+        "common_myths": [
+            "A common myth is that more data always improves decisions.",
+            "Another myth is that metrics reduce bias, even though they often encode it.",
+            "People also assume that optimization equals progress, which is not always true.",
+        ],
+        "why_misunderstood": [
+            "Intelligent people still misunderstand the system because the feedback is delayed and indirect.",
+            "The benefits are concentrated, while the harms are diffuse and harder to measure.",
+            "That makes the system feel stable even when it is drifting off course.",
+        ],
+    }
+    return templates.get(axis, [])
+
+
+def _build_expansion_block(axis: str, used_sentences: set[str]) -> list[str]:
+    sentences = _axis_templates(axis)
+    pools = _phrase_pools()
+    templates = [
+        "{agent} respond to {metric} pressure by narrowing choices, even when it hurts outcomes.",
+        "{system} turn {metric} into a proxy for {stake}, which can {effect} over time.",
+        "In practice, {metric} becomes a shortcut for judgment because it is visible and repeatable.",
+        "Over time, {system} learn to {effect} without changing the incentives driving behavior.",
+        "When {stake} depends on {metric}, adaptation happens faster than reflection.",
+    ]
     block: list[str] = []
+    word_count = 0
     for sentence in sentences:
-        sentence_words = len(sentence.split())
-        if words + sentence_words > EXPANSION_MAX_WORDS:
+        if sentence not in used_sentences:
+            block.append(sentence)
+            used_sentences.add(sentence)
+            word_count += len(sentence.split())
+    attempts = 0
+    while word_count < EXPANSION_MIN_WORDS and attempts < 2000:
+        template = random.choice(templates)
+        sentence = template.format(
+            agent=random.choice(pools["agents"]),
+            system=random.choice(pools["systems"]),
+            metric=random.choice(pools["metrics"]),
+            effect=random.choice(pools["effects"]),
+            stake=random.choice(pools["stakes"]),
+        )
+        attempts += 1
+        if sentence in used_sentences:
             continue
+        used_sentences.add(sentence)
         block.append(sentence)
-        words += sentence_words
-        if words >= EXPANSION_MIN_WORDS:
-            break
-    if words < EXPANSION_MIN_WORDS:
+        word_count += len(sentence.split())
+    if word_count < EXPANSION_MIN_WORDS:
         raise RuntimeError("Unable to build expansion block without repetition.")
-    return block
+    trimmed = []
+    trimmed_words = 0
+    for sentence in block:
+        words = len(sentence.split())
+        if trimmed_words + words > EXPANSION_MAX_WORDS:
+            break
+        trimmed.append(sentence)
+        trimmed_words += words
+        if trimmed_words >= EXPANSION_MIN_WORDS:
+            break
+    if trimmed_words < EXPANSION_MIN_WORDS:
+        raise RuntimeError("Unable to trim expansion block to target size.")
+    return [_trim_line(line) for line in trimmed]
 
 
-def _append_expansion(lines: list[str], used: set[str]) -> list[str]:
-    block = _build_expansion_block(used)
+def _append_expansion(lines: list[str], used: set[str], axis: str) -> list[str]:
+    block = _build_expansion_block(axis, used)
     for line in block:
         if line not in used:
             lines.append(line)
@@ -235,22 +332,22 @@ def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
             lines.append(line)
             used.add(line)
 
-    for line in _generate_sentences("cold_open", 140, used):
+    for line in _generate_sentences("cold_open", 120, used):
         add_unique(line)
     lines.append("")
-    for line in _generate_sentences("problem_setup", 320, used):
+    for line in _generate_sentences("problem_setup", 420, used):
         add_unique(line)
     lines.append("")
-    for line in _generate_sentences("system_explanation", 650, used):
+    for line in _generate_sentences("system_explanation", 950, used):
         add_unique(line)
     lines.append("")
-    for line in _generate_sentences("hidden_consequences", 300, used):
+    for line in _generate_sentences("hidden_consequences", 360, used):
         add_unique(line)
     lines.append("")
-    for line in _generate_sentences("big_picture", 240, used):
+    for line in _generate_sentences("big_picture", 420, used):
         add_unique(line)
     lines.append("")
-    for line in _generate_sentences("closing", 120, used):
+    for line in _generate_sentences("closing", 150, used):
         add_unique(line)
 
     lines = [line for line in lines if line.strip()]
@@ -258,8 +355,12 @@ def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
     estimated_seconds = _estimate_seconds(script)
     word_count = len(script.split())
     passes = 0
+    axes = _expansion_axes()
     while (estimated_seconds < MIN_TARGET_SECONDS or word_count < MIN_TARGET_WORDS) and passes < MAX_EXPANSION_PASSES:
-        lines = _append_expansion(lines, used)
+        if passes >= len(axes):
+            break
+        axis = axes[passes]
+        lines = _append_expansion(lines, used, axis)
         lines = _truncate_lines(lines)
         script = "\n".join(lines)
         estimated_seconds = _estimate_seconds(script)
@@ -280,8 +381,32 @@ def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
 def expand_script_once(script_text: str) -> ScriptResult:
     lines = [line.strip() for line in script_text.splitlines() if line.strip()]
     used = set(lines)
-    lines = _append_expansion(lines, used)
+    axes = _expansion_axes()
+    if not axes:
+        raise RuntimeError("No expansion axes available.")
+    lines = _append_expansion(lines, used, axes[0])
     lines = _truncate_lines(lines)
     expanded_text = "\n".join(lines)
     estimated_seconds = _estimate_seconds(expanded_text)
     return ScriptResult(text=expanded_text, estimated_seconds=estimated_seconds)
+
+
+def generate_titles(script_text: str) -> list[str]:
+    titles = [
+        "Why This System Rewards the Wrong People",
+        "The Hidden Logic Behind Modern Work",
+        "This Incentive Quietly Changed Everything",
+        "How Metrics Became a Form of Power",
+        "The Psychological Cost of Incentive Design",
+        "What Technology Counts, Society Becomes",
+    ]
+    random.shuffle(titles)
+    return titles[:3]
+
+
+def generate_description(script_text: str) -> str:
+    return (
+        "A clear explanation of how incentives, technology, and psychology shape "
+        "modern systems, why metrics become power, and what second-order effects "
+        "emerge when organizations optimize for the wrong signals."
+    )

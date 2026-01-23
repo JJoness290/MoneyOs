@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Tuple
 
 import numpy as np
-from moviepy.editor import AudioFileClip, CompositeVideoClip, ImageClip, VideoFileClip
+from moviepy.editor import AudioFileClip, CompositeVideoClip, ImageClip, VideoFileClip, concatenate_videoclips
 from PIL import Image, ImageDraw, ImageFont
 
 from app.config import MINECRAFT_BG_DIR, TARGET_FPS, TARGET_RESOLUTION
@@ -70,9 +70,9 @@ def _ensure_background_clips() -> list[Path]:
     return backgrounds
 
 
-def _select_background(backgrounds: list[Path]) -> Path:
+def _select_background(backgrounds: list[Path]) -> list[Path]:
     if len(backgrounds) < 2:
-        raise RuntimeError("At least two Minecraft background clips are required to prevent reuse.")
+        raise RuntimeError("At least two background clips are required to prevent reuse.")
     history = _load_usage_history()
     last_used = history[-1] if history else None
     candidates = [path for path in backgrounds if str(path) != last_used]
@@ -85,25 +85,38 @@ def _select_background(backgrounds: list[Path]) -> Path:
         except ValueError:
             return -1
 
-    selected = min(candidates, key=usage_index)
-    if str(selected) in history:
-        history.remove(str(selected))
-    history.append(str(selected))
-    _save_usage_history(history)
-    return selected
+    ordered = sorted(candidates, key=usage_index)
+    return ordered
 
 
 def _load_background(audio_duration: float) -> VideoFileClip:
     backgrounds = _ensure_background_clips()
-    bg_path = _select_background(backgrounds)
-    bg = VideoFileClip(str(bg_path)).without_audio()
-    bg = _fit_background(bg)
-    if bg.duration < audio_duration:
-        raise RuntimeError(
-            "Minecraft background shorter than audio. "
-            "Provide longer footage."
-        )
-    return bg.subclip(0, audio_duration)
+    ordered = _select_background(backgrounds)
+    remaining = audio_duration
+    clips: list[VideoFileClip] = []
+    history = _load_usage_history()
+
+    for path in ordered:
+        if remaining <= 0:
+            break
+        clip = VideoFileClip(str(path)).without_audio()
+        clip = _fit_background(clip)
+        if clip.duration <= 0:
+            clip.close()
+            continue
+        duration = min(clip.duration, remaining)
+        clips.append(clip.subclip(0, duration))
+        remaining -= duration
+        history = [item for item in history if item != str(path)]
+        history.append(str(path))
+
+    if remaining > 0:
+        for clip in clips:
+            clip.close()
+        raise RuntimeError("Available background footage is shorter than audio.")
+
+    _save_usage_history(history)
+    return concatenate_videoclips(clips, method="compose")
 
 
 def _chunk_subtitles(text: str, min_words: int = 2, max_words: int = 6) -> list[str]:
@@ -156,7 +169,7 @@ def _subtitle_clip(text: str, duration: float, resolution: Tuple[int, int]) -> I
         lines.append(" ".join(current))
 
     total_height = sum(font.getbbox(line)[3] for line in lines) + (len(lines) - 1) * 8
-    y = height - 260 - total_height
+    y = height - 180 - total_height
     for line in lines:
         line_width = draw.textlength(line, font=font)
         x = (width - line_width) / 2
