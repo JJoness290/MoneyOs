@@ -1,5 +1,6 @@
 import asyncio
 import re
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -64,11 +65,12 @@ def generate_tts(script_text: str, output_path: Path, voice: str = DEFAULT_VOICE
     Generates full audio from text in ONE pass.
     Returns duration in seconds.
     """
-    chunks = split_script_for_tts(script_text, max_chars=800)
-    if len(chunks) < 2:
-        raise RuntimeError(
-            f"TTS chunking failed: expected multiple chunks, got {len(chunks)}"
-        )
+    char_count = len(script_text)
+    max_safe_chars = 800
+    if char_count <= max_safe_chars:
+        chunks = [script_text]
+    else:
+        chunks = split_script_for_tts(script_text, max_chars=max_safe_chars)
 
     chunk_paths: list[Path] = []
     chunk_durations: list[float] = []
@@ -78,12 +80,15 @@ def generate_tts(script_text: str, output_path: Path, voice: str = DEFAULT_VOICE
         chunk_paths.append(chunk_path)
         chunk_durations.append(duration)
 
-    clips = [AudioFileClip(str(path)) for path in chunk_paths]
-    final_audio = concatenate_audioclips(clips)
-    final_audio.write_audiofile(str(output_path), logger=None)
-    final_audio.close()
-    for clip in clips:
-        clip.close()
+    if len(chunk_paths) == 1:
+        shutil.move(str(chunk_paths[0]), str(output_path))
+    else:
+        clips = [AudioFileClip(str(path)) for path in chunk_paths]
+        final_audio = concatenate_audioclips(clips)
+        final_audio.write_audiofile(str(output_path), logger=None)
+        final_audio.close()
+        for clip in clips:
+            clip.close()
 
     final = AudioFileClip(str(output_path))
     final_duration = float(final.duration)
