@@ -36,21 +36,29 @@ def _usage_path() -> Path:
     return MINECRAFT_BG_DIR / ".usage.json"
 
 
-def _load_usage_history() -> list[str]:
+def _load_usage_history() -> dict[str, list[tuple[float, float]]]:
     path = _usage_path()
     if not path.exists():
-        return []
+        return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        return []
-    if isinstance(data, list):
-        return [str(item) for item in data]
-    return []
+        return {}
+    history: dict[str, list[tuple[float, float]]] = {}
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if isinstance(value, list):
+                segments: list[tuple[float, float]] = []
+                for entry in value:
+                    if isinstance(entry, list) and len(entry) == 2:
+                        segments.append((float(entry[0]), float(entry[1])))
+                history[str(key)] = segments
+    return history
 
 
-def _save_usage_history(history: list[str]) -> None:
-    _usage_path().write_text(json.dumps(history[-200:]), encoding="utf-8")
+def _save_usage_history(history: dict[str, list[tuple[float, float]]]) -> None:
+    payload = {key: segments[-200:] for key, segments in history.items()}
+    _usage_path().write_text(json.dumps(payload), encoding="utf-8")
 
 
 def _ensure_background_clips() -> list[Path]:
@@ -70,52 +78,67 @@ def _ensure_background_clips() -> list[Path]:
     return backgrounds
 
 
-def _select_background(backgrounds: list[Path]) -> list[Path]:
-    if len(backgrounds) < 2:
-        raise RuntimeError("At least two background clips are required to prevent reuse.")
-    history = _load_usage_history()
-    last_used = history[-1] if history else None
-    candidates = [path for path in backgrounds if str(path) != last_used]
-    if not candidates:
-        raise RuntimeError("Unable to select a non-repeating background clip.")
+def _segments_overlap(a_start: float, a_end: float, b_start: float, b_end: float) -> bool:
+    return max(a_start, b_start) < min(a_end, b_end)
 
-    def usage_index(path: Path) -> int:
-        try:
-            return history.index(str(path))
-        except ValueError:
-            return -1
 
-    ordered = sorted(candidates, key=usage_index)
-    return ordered
+def _select_segment(
+    clip_duration: float,
+    segment_duration: float,
+    used_segments: list[tuple[float, float]],
+    attempts: int = 30,
+) -> tuple[float, float] | None:
+    if clip_duration <= segment_duration:
+        start, end = 0.0, min(clip_duration, segment_duration)
+        if any(_segments_overlap(start, end, used_start, used_end) for used_start, used_end in used_segments):
+            return None
+        return start, end
+    for _ in range(attempts):
+        start = random.uniform(0, clip_duration - segment_duration)
+        end = start + segment_duration
+        if any(_segments_overlap(start, end, used_start, used_end) for used_start, used_end in used_segments):
+            continue
+        return start, end
+    return None
 
 
 def _load_background(audio_duration: float) -> VideoFileClip:
     backgrounds = _ensure_background_clips()
-    ordered = _select_background(backgrounds)
+    usage = _load_usage_history()
+    rng = random.Random()
     remaining = audio_duration
     clips: list[VideoFileClip] = []
-    history = _load_usage_history()
+    attempts = 0
+    max_attempts = max(10, len(backgrounds) * 30)
 
-    for path in ordered:
-        if remaining <= 0:
-            break
+    while remaining > 0 and attempts < max_attempts:
+        attempts += 1
+        path = rng.choice(backgrounds)
         clip = VideoFileClip(str(path)).without_audio()
         clip = _fit_background(clip)
         if clip.duration <= 0:
             clip.close()
             continue
-        duration = min(clip.duration, remaining)
-        clips.append(clip.subclip(0, duration))
-        remaining -= duration
-        history = [item for item in history if item != str(path)]
-        history.append(str(path))
+
+        segment_duration = min(remaining, rng.uniform(20, 60))
+        used_segments = usage.get(str(path), [])
+        selection = _select_segment(clip.duration, segment_duration, used_segments)
+        if selection is None:
+            clip.close()
+            continue
+
+        start, end = selection
+        used_segments.append((start, end))
+        usage[str(path)] = used_segments
+        clips.append(clip.subclip(start, end))
+        remaining -= (end - start)
 
     if remaining > 0:
         for clip in clips:
             clip.close()
         raise RuntimeError("Available background footage is shorter than audio.")
 
-    _save_usage_history(history)
+    _save_usage_history(usage)
     return concatenate_videoclips(clips, method="compose")
 
 
@@ -204,6 +227,8 @@ def build_video(
     if audio_duration <= 0:
         audio_clip.close()
         raise RuntimeError("Audio duration is zero.")
+    if audio_duration > 1200:
+        print("Warning: Video render may take a long time for extended durations.")
     background = _load_background(audio_duration)
     subtitle_clips = _build_subtitles(script_text, audio_duration)
     layers = [background] + subtitle_clips

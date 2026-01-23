@@ -1,5 +1,4 @@
 import asyncio
-import hashlib
 import random
 import re
 from dataclasses import dataclass
@@ -9,10 +8,6 @@ import edge_tts
 from pydub import AudioSegment, effects, silence
 
 from app.config import DEFAULT_VOICE
-
-FADE_MS = 5
-MIN_SILENCE_MS = 200
-MAX_SILENCE_MS = 350
 
 
 @dataclass
@@ -41,35 +36,17 @@ def _random_pitch() -> str:
     return f"{sign}{percent:.1f}%"
 
 
-def _hash_file(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def _generate_sentence_audio(
-    text: str,
-    output_path: Path,
-    voice: str,
-    rate: str | None,
-    pitch: str | None,
-) -> None:
+def _generate_tts_audio(text: str, output_path: Path, voice: str, rate: str, pitch: str) -> None:
     async def _run() -> None:
-        settings: dict[str, str] = {}
-        if rate:
-            settings["rate"] = rate
-        if pitch:
-            settings["pitch"] = pitch
         communicate = edge_tts.Communicate(
             text,
             voice=voice,
-            **settings,
+            rate=rate,
+            pitch=pitch,
         )
         await communicate.save(str(output_path))
 
     asyncio.run(_run())
-
-
-def _apply_fades(segment: AudioSegment) -> AudioSegment:
-    return segment.fade_in(FADE_MS).fade_out(FADE_MS)
 
 
 def _remove_micro_silences(segment: AudioSegment) -> AudioSegment:
@@ -94,72 +71,29 @@ def generate_tts(
     if not sentences:
         raise RuntimeError("Script text is empty after splitting.")
 
-    chunk_durations: list[float] = []
-    combined = AudioSegment.silent(duration=0)
-    seen_hashes: set[str] = set()
+    rate = _random_rate()
+    pitch = _random_pitch()
+    _generate_tts_audio(script_text, output_path, voice, rate=rate, pitch=pitch)
 
-    for index, sentence in enumerate(sentences):
-        chunk_path = output_path.with_name(f"{output_path.stem}_chunk{index}.mp3")
-        print(f"TTS sentence {index + 1}/{len(sentences)}")
-        try:
-            _generate_sentence_audio(
-                sentence,
-                chunk_path,
-                voice,
-                rate=_random_rate(),
-                pitch=_random_pitch(),
-            )
-        except Exception:
-            if chunk_path.exists():
-                chunk_path.unlink()
-            print("TTS retry with neutral settings")
-            _generate_sentence_audio(
-                sentence,
-                chunk_path,
-                voice,
-                rate=None,
-                pitch=None,
-            )
-
-        if not chunk_path.exists():
-            raise RuntimeError("TTS failed to generate audio for sentence.")
-
-        chunk_hash = _hash_file(chunk_path)
-        if chunk_hash in seen_hashes:
-            raise RuntimeError("Repeated audio detected in TTS output.")
-        seen_hashes.add(chunk_hash)
-
-        segment = AudioSegment.from_file(chunk_path)
-        segment = _apply_fades(segment)
-        chunk_durations.append(segment.duration_seconds)
-
-        if len(combined) == 0:
-            combined = segment
-        else:
-            combined = combined.append(segment, crossfade=FADE_MS)
-
-        silence_duration = random.randint(MIN_SILENCE_MS, MAX_SILENCE_MS)
-        silence_segment = AudioSegment.silent(duration=silence_duration)
-        combined = combined.append(silence_segment, crossfade=FADE_MS)
-
-        chunk_path.unlink(missing_ok=True)
-
-    combined = effects.normalize(combined)
-    combined = _remove_micro_silences(combined)
-    combined.export(output_path, format="mp3")
+    audio = AudioSegment.from_file(output_path)
+    audio = effects.normalize(audio)
+    audio = _remove_micro_silences(audio)
+    audio.export(output_path, format="mp3")
 
     final_audio = AudioSegment.from_file(output_path)
     final_duration = final_audio.duration_seconds
 
-    expected_total = sum(chunk_durations) + (len(sentences) * MIN_SILENCE_MS / 1000.0)
-    if final_duration < expected_total - 0.5:
-        raise RuntimeError("Final audio appears truncated.")
-    if expected_seconds is not None and final_duration < expected_seconds:
-        raise RuntimeError("Generated audio is shorter than expected script length.")
+    if expected_seconds is not None:
+        min_expected = expected_seconds * 0.9
+        max_expected = expected_seconds * 1.1
+        if final_duration < min_expected:
+            raise RuntimeError("Generated audio is shorter than expected script length.")
+        if final_duration > max_expected:
+            raise RuntimeError("Generated audio is longer than expected script length.")
 
     return TTSResult(
         audio_path=output_path,
         duration_seconds=final_duration,
-        chunk_count=len(sentences),
-        chunk_durations=chunk_durations,
+        chunk_count=1,
+        chunk_durations=[final_duration],
     )

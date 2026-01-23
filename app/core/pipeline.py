@@ -3,13 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 from app.config import AUDIO_DIR, MIN_AUDIO_SECONDS, SCRIPTS_DIR, VIDEO_DIR
-from app.core.script_gen import (
-    ScriptResult,
-    generate_description,
-    generate_script,
-    generate_titles,
-    sanitize_script,
-)
+from app.core.script_gen import ScriptResult, generate_description, generate_script, generate_titles
 from app.core.tts import TTSResult, generate_tts
 from app.core.video_builder import VideoBuildResult, build_video
 
@@ -45,7 +39,6 @@ def run_pipeline(status_callback) -> PipelineResult:
     status_callback("Generating script...")
     print("Script generation started")
     script = generate_script(min_seconds=MIN_AUDIO_SECONDS)
-    sanitized_script = sanitize_script(script.text)
     word_count = len(script.text.split())
     titles = generate_titles(script.text)
     description = generate_description(script.text)
@@ -58,7 +51,7 @@ def run_pipeline(status_callback) -> PipelineResult:
     status_callback("Generating TTS...")
     print("TTS generation started")
     audio_path = _build_audio_path(video_id)
-    tts_result = generate_tts(sanitized_script, audio_path, expected_seconds=script.estimated_seconds)
+    tts_result = generate_tts(script.text, audio_path, expected_seconds=script.estimated_seconds)
     status_callback(
         "TTS chunks="
         f"{tts_result.chunk_count} | chunk_durations={tts_result.chunk_durations} | "
@@ -71,7 +64,7 @@ def run_pipeline(status_callback) -> PipelineResult:
 
     status_callback("Rendering video...")
     video_path = _build_video_path(video_id)
-    video_result = build_video(sanitized_script, tts_result.audio_path, video_path)
+    video_result = build_video(script.text, tts_result.audio_path, video_path)
 
     status_callback(
         f"Done (audio: {tts_result.duration_seconds:.2f}s, video: {video_result.duration_seconds:.2f}s)"

@@ -4,7 +4,9 @@ from dataclasses import dataclass
 
 from app.config import MIN_AUDIO_SECONDS
 
-WORDS_PER_SECOND = 3.0
+WORDS_PER_SECOND = 2.5
+MIN_WORDS = 1500
+MAX_WORDS = 2500
 _SCRIPT_GENERATED = False
 
 
@@ -340,8 +342,18 @@ def _validate_no_repetition(sentences: list[str]) -> None:
 def _story_seed(topic: str) -> list[str]:
     return [
         f"Alright, here's what happened with {topic}.",
-        "It started small, the kind of thing you'd normally skip.",
+        "At first it sounded harmless, almost boring, and that was the trick.",
+        "By the time anyone noticed, the pressure was already building.",
     ]
+
+
+def _set_phase(state: StoryState, progress: float) -> None:
+    if progress > 0.85:
+        state.phase = "conclusion"
+    elif progress > 0.7:
+        state.phase = "reveal"
+    elif progress > 0.4:
+        state.phase = "tension"
 
 
 def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
@@ -365,7 +377,10 @@ def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
         lines.append(seed)
         used_sentences.append(seed)
 
-    while _estimate_seconds(" ".join(lines)) < float(min_seconds):
+    target_words = random.randint(MIN_WORDS, MAX_WORDS)
+    while len(" ".join(lines).split()) < target_words:
+        progress = len(" ".join(lines).split()) / max(target_words, 1)
+        _set_phase(state, progress)
         beat = _build_beat(state)
         sentence = _sentence_from_beat(state, beat, used_sentences)
         used_sentences.append(sentence)
@@ -381,9 +396,12 @@ def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
 
     script = "\n".join(lines).strip()
     script = sanitize_script(script)
+    word_count = len(script.split())
+    if word_count < MIN_WORDS:
+        raise RuntimeError("Script length is shorter than required word count.")
+    if word_count > MAX_WORDS:
+        raise RuntimeError("Script length exceeds maximum word count.")
     estimated_seconds = _estimate_seconds(script)
-    if estimated_seconds < float(min_seconds):
-        raise RuntimeError("Script length is shorter than required duration.")
     _validate_no_repetition(_split_sentences(script))
     _SCRIPT_GENERATED = True
     return ScriptResult(text=script, estimated_seconds=estimated_seconds)
