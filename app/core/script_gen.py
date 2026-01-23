@@ -7,8 +7,10 @@ from app.config import MIN_AUDIO_SECONDS
 
 WORDS_PER_SECOND = 3.0
 MAX_WORDS_PER_LINE = 12
-MAX_LINES = 120
+MAX_LINES = 400
 MIN_TARGET_SECONDS = 80
+MIN_TARGET_WORDS = 2200
+MAX_TARGET_WORDS = 3000
 MAX_EXPANSION_PASSES = 4
 EXPANSION_MIN_WORDS = 200
 EXPANSION_MAX_WORDS = 250
@@ -41,64 +43,13 @@ def sanitize_script(text: str) -> str:
 
 def _story_theme() -> str:
     themes = [
-        "relationship red flags",
-        "friend betrayal",
-        "work and boss situations",
-        "family conflict",
-        "realisation moments",
+        "incentive design in digital platforms",
+        "how metrics reshape human judgment",
+        "why status systems distort decisions",
+        "the psychology of compliance in modern workplaces",
+        "the invisible economics of attention",
     ]
     return random.choice(themes)
-
-
-def _build_story_lines() -> list[str]:
-    theme = _story_theme()
-    hooks = [
-        "I didn't think this was a red flag at the time.",
-        "I ignored a small sign, and it snowballed fast.",
-        "I told myself it was nothing. It wasn't.",
-        "I wish I noticed this sooner.",
-    ]
-    contexts = [
-        f"This happened during a {theme} phase in my life.",
-        "We were close, so I let things slide.",
-        "It started as a normal week, nothing dramatic.",
-        "I was trying to keep things calm and normal.",
-    ]
-    escalations = [
-        "Little things kept piling up.",
-        "The tone shifted in small ways I brushed off.",
-        "I kept second-guessing my own reactions.",
-        "I started feeling tense even before we spoke.",
-    ]
-    turning_points = [
-        "Then one moment flipped everything.",
-        "The turning point was quick and sharp.",
-        "One comment finally made it click.",
-        "A small scene made the whole pattern obvious.",
-    ]
-    reflections = [
-        "After that, I saw how often I ignored my gut.",
-        "I realized I was making excuses for behavior that hurt.",
-        "Looking back, I wasn't being honest with myself.",
-        "I learned that quiet discomfort adds up fast.",
-    ]
-    ctas = [
-        "Has anyone else experienced this?",
-        "Would you have noticed this sooner?",
-        "Is this a common pattern, or just me?",
-        "What would you have done differently?",
-    ]
-
-    base_lines = [
-        random.choice(hooks),
-        random.choice(contexts),
-        random.choice(escalations),
-        random.choice(turning_points),
-        random.choice(reflections),
-        random.choice(ctas),
-    ]
-
-    return [_trim_line(line) for line in base_lines]
 
 
 def _truncate_lines(lines: list[str]) -> list[str]:
@@ -110,46 +61,160 @@ def _truncate_lines(lines: list[str]) -> list[str]:
     return truncated or lines[:MAX_LINES]
 
 
-def _expansion_sentences() -> list[str]:
-    return [
-        "Looking back, I see how small signals were adding weight each day.",
-        "I kept trying to explain things away instead of naming what hurt.",
-        "The hardest part was admitting I felt off long before the turning point.",
-        "If you are unsure, notice the moments you feel relief when they are gone.",
-        "I learned that comfort should not require constant self editing.",
-        "I wish I had asked why I was always bracing before conversations.",
-        "The pattern felt normal only because I kept shrinking to fit it.",
-        "It helped me to write down the moments that felt heavy and repetitive.",
-        "When I finally said it out loud, the situation made more sense.",
-        "I realized that real care does not leave you confused for days.",
-        "If you feel tense all the time, that is information you should trust.",
-        "I started paying attention to how my body reacted before my words did.",
-        "What I needed most was clarity, not another excuse to stay quiet.",
-        "This taught me that kindness is not the same as endurance.",
-        "I wish I had protected my peace earlier instead of later.",
-        "You are allowed to step back when something keeps feeling wrong.",
-        "It helped to hear other people share similar stories and name the feeling.",
-        "Now I check in with myself instead of dismissing the discomfort.",
-        "I try to choose environments where I do not have to perform calm.",
-        "That change made my relationships feel lighter and more honest.",
+def _section_templates() -> dict[str, list[str]]:
+    return {
+        "cold_open": [
+            "Most systems reward what they can measure, not what they truly need.",
+            "The strange part is that the numbers feel objective, but they are steering us.",
+            "Here is the contradiction: better data can make worse decisions.",
+            "The question is not who is right, but which incentives are doing the talking.",
+            "If you want to understand modern power, follow the metrics people optimize.",
+        ],
+        "problem_setup": [
+            "We live inside systems that translate messy human goals into simplified scores.",
+            "Those scores do not just reflect reality, they reshape it by defining success.",
+            "People adapt quickly to whatever is rewarded, even when it conflicts with intention.",
+            "This matters because money, status, and opportunity flow through these scoreboards.",
+            "The result is a quiet drift from values to outputs, from meaning to measurement.",
+        ],
+        "system_explanation": [
+            "Incentives work by narrowing attention to what gets counted and repeated.",
+            "Once a metric exists, people learn how to improve it, whether or not it helps.",
+            "Technology accelerates this feedback loop by making measurement constant.",
+            "Systems prefer signals that are easy to aggregate, even if they are shallow.",
+            "Psychology adds fuel: humans chase visible progress, especially under pressure.",
+            "When careers and budgets depend on a metric, it becomes the real goal.",
+            "This is how local optimization can quietly undermine the original mission.",
+            "The architecture looks rational, but it rewards strategic behavior over truth.",
+            "The more complex the system, the more people rely on proxies to decide.",
+        ],
+        "hidden_consequences": [
+            "Second order effects emerge when everyone learns the same shortcuts.",
+            "Those who can game the metric gain influence, even if they create fragility.",
+            "Groups with less access to the rules are forced to compete on worse terms.",
+            "Over time, the system selects for conformity to the metric instead of competence.",
+            "This can hollow out trust because outcomes feel disconnected from reality.",
+        ],
+        "big_picture": [
+            "Zooming out, incentives become a language that links psychology, money, and power.",
+            "Technology scales that language, making it harder to see the tradeoffs.",
+            "Society then reorganizes around what is legible to the system, not what is wise.",
+            "The deeper insight is that measurement is a political act, not a neutral one.",
+        ],
+        "closing": [
+            "A useful question is not how to win the game, but who wrote the rules.",
+            "If you change the incentive, you change the story the system tells itself.",
+            "That is why the most powerful shifts happen quietly, inside the metrics.",
+        ],
+    }
+
+
+def _phrase_pools() -> dict[str, list[str]]:
+    return {
+        "agents": [
+            "managers",
+            "platform designers",
+            "policy teams",
+            "investors",
+            "operators",
+            "engineers",
+            "frontline workers",
+            "regulators",
+        ],
+        "systems": [
+            "platforms",
+            "markets",
+            "institutions",
+            "organizations",
+            "algorithms",
+            "workflows",
+            "rating systems",
+        ],
+        "metrics": [
+            "engagement",
+            "productivity",
+            "compliance",
+            "growth",
+            "risk",
+            "output",
+            "efficiency",
+        ],
+        "effects": [
+            "distort judgment",
+            "change behavior",
+            "compress nuance",
+            "reward shortcuts",
+            "shift incentives",
+            "redefine success",
+            "hide tradeoffs",
+        ],
+        "stakes": [
+            "capital allocation",
+            "status hierarchies",
+            "career mobility",
+            "public trust",
+            "social legitimacy",
+            "strategic advantage",
+        ],
+    }
+
+
+def _generate_sentences(section: str, target_words: int, used: set[str]) -> list[str]:
+    pools = _phrase_pools()
+    templates = [
+        "{agent} inside {system} optimize for {metric} because it is visible and rewarded.",
+        "When {metric} becomes the scoreboard, it can {effect} across the whole system.",
+        "The system feels objective, yet it can {effect} in ways people rarely notice.",
+        "{agent} often chase {metric} to protect {stake}, even when it backfires later.",
+        "In complex {system}, proxies for {metric} become the fastest path to decisions.",
+        "What looks like progress can {effect} the feedback people depend on.",
+        "The system rewards alignment with {metric}, not alignment with the original mission.",
+        "This is why {system} can {effect} when incentives tighten under pressure.",
     ]
+    seed_sentences = _section_templates().get(section, [])
+    sentences = []
+    word_count = 0
+    for sentence in seed_sentences:
+        if sentence not in used:
+            sentences.append(sentence)
+            used.add(sentence)
+            word_count += len(sentence.split())
+    attempts = 0
+    while word_count < target_words and attempts < 2000:
+        template = random.choice(templates)
+        sentence = template.format(
+            agent=random.choice(pools["agents"]),
+            system=random.choice(pools["systems"]),
+            metric=random.choice(pools["metrics"]),
+            effect=random.choice(pools["effects"]),
+            stake=random.choice(pools["stakes"]),
+        )
+        attempts += 1
+        if sentence in used:
+            continue
+        used.add(sentence)
+        sentences.append(sentence)
+        word_count += len(sentence.split())
+    if word_count < target_words:
+        raise RuntimeError("Unable to generate enough unique sentences for section.")
+    return [_trim_line(line) for line in sentences]
 
 
 def _build_expansion_block(used_sentences: set[str]) -> list[str]:
-    sentences = [s for s in _expansion_sentences() if s not in used_sentences]
+    sentences = _generate_sentences("system_explanation", EXPANSION_MIN_WORDS, used_sentences)
+    words = 0
     block: list[str] = []
-    word_count = 0
     for sentence in sentences:
-        words = sentence.split()
-        if word_count + len(words) > EXPANSION_MAX_WORDS:
+        sentence_words = len(sentence.split())
+        if words + sentence_words > EXPANSION_MAX_WORDS:
             continue
         block.append(sentence)
-        word_count += len(words)
-        if word_count >= EXPANSION_MIN_WORDS:
+        words += sentence_words
+        if words >= EXPANSION_MIN_WORDS:
             break
-    if word_count < EXPANSION_MIN_WORDS:
+    if words < EXPANSION_MIN_WORDS:
         raise RuntimeError("Unable to build expansion block without repetition.")
-    return [_trim_line(line) for line in block]
+    return block
 
 
 def _append_expansion(lines: list[str], used: set[str]) -> list[str]:
@@ -170,33 +235,46 @@ def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
             lines.append(line)
             used.add(line)
 
-    try:
-        for line in _build_story_lines():
-            add_unique(line)
+    for line in _generate_sentences("cold_open", 140, used):
+        add_unique(line)
+    lines.append("")
+    for line in _generate_sentences("problem_setup", 320, used):
+        add_unique(line)
+    lines.append("")
+    for line in _generate_sentences("system_explanation", 650, used):
+        add_unique(line)
+    lines.append("")
+    for line in _generate_sentences("hidden_consequences", 300, used):
+        add_unique(line)
+    lines.append("")
+    for line in _generate_sentences("big_picture", 240, used):
+        add_unique(line)
+    lines.append("")
+    for line in _generate_sentences("closing", 120, used):
+        add_unique(line)
 
-        script = "\n".join(lines)
-        estimated_seconds = _estimate_seconds(script)
-        passes = 0
-        while estimated_seconds < MIN_TARGET_SECONDS and passes < MAX_EXPANSION_PASSES:
-            lines = _append_expansion(lines, used)
-            lines = _truncate_lines(lines)
-            script = "\n".join(lines)
-            estimated_seconds = _estimate_seconds(script)
-            passes += 1
-
-        if estimated_seconds < MIN_TARGET_SECONDS:
-            raise RuntimeError("Script too short after maximum expansion passes.")
-
+    lines = [line for line in lines if line.strip()]
+    script = "\n".join(lines)
+    estimated_seconds = _estimate_seconds(script)
+    word_count = len(script.split())
+    passes = 0
+    while (estimated_seconds < MIN_TARGET_SECONDS or word_count < MIN_TARGET_WORDS) and passes < MAX_EXPANSION_PASSES:
+        lines = _append_expansion(lines, used)
         lines = _truncate_lines(lines)
         script = "\n".join(lines)
         estimated_seconds = _estimate_seconds(script)
-        return ScriptResult(text=script, estimated_seconds=estimated_seconds)
-    except Exception:  # noqa: BLE001
-        logging.warning("Script generation encountered an error; returning partial script.")
-        lines = _truncate_lines(lines)
-        script = "\n".join(lines)
-        estimated_seconds = _estimate_seconds(script) if script else 0.0
-        return ScriptResult(text=script, estimated_seconds=estimated_seconds)
+        word_count = len(script.split())
+        passes += 1
+
+    if estimated_seconds < MIN_TARGET_SECONDS or word_count < MIN_TARGET_WORDS:
+        raise RuntimeError("Script too short after maximum expansion passes.")
+    if word_count > MAX_TARGET_WORDS:
+        raise RuntimeError("Script exceeds maximum target word count.")
+
+    lines = _truncate_lines(lines)
+    script = "\n".join(lines)
+    estimated_seconds = _estimate_seconds(script)
+    return ScriptResult(text=script, estimated_seconds=estimated_seconds)
 
 
 def expand_script_once(script_text: str) -> ScriptResult:
