@@ -1,14 +1,13 @@
 from dataclasses import dataclass
-import math
 import random
 from pathlib import Path
 from typing import Tuple
 
 import numpy as np
-from moviepy.editor import AudioFileClip, CompositeVideoClip, ImageClip, VideoClip
+from moviepy.editor import AudioFileClip, CompositeVideoClip, ImageClip, VideoFileClip, vfx
 from PIL import Image, ImageDraw, ImageFont
 
-from app.config import TARGET_FPS, TARGET_RESOLUTION
+from app.config import MINECRAFT_BG_DIR, TARGET_FPS, TARGET_RESOLUTION
 
 
 @dataclass
@@ -17,78 +16,33 @@ class VideoBuildResult:
     duration_seconds: float
 
 
-def _generate_platforms(seed: int, count: int, spacing: float) -> list[dict]:
-    rng = random.Random(seed)
-    platforms = []
-    for index in range(count):
-        platforms.append(
-            {
-                "offset": index * spacing,
-                "width": rng.uniform(0.35, 0.7),
-                "height": rng.uniform(0.04, 0.08),
-                "x": rng.uniform(-0.25, 0.25),
-            }
-        )
-    return platforms
+def _fit_background(clip: VideoFileClip) -> VideoFileClip:
+    target_w, target_h = TARGET_RESOLUTION
+    clip = clip.resize(height=target_h) if clip.h < target_h else clip.resize(height=target_h)
+    if clip.w < target_w:
+        clip = clip.resize(width=target_w)
+    x_center = clip.w / 2
+    y_center = clip.h / 2
+    return clip.crop(
+        x_center=x_center,
+        y_center=y_center,
+        width=target_w,
+        height=target_h,
+    )
 
 
-def _render_frame(
-    t: float,
-    duration: float,
-    resolution: Tuple[int, int],
-    platforms: list[dict],
-    loop_length: float,
-) -> np.ndarray:
-    width, height = resolution
-    frame = np.zeros((height, width, 3), dtype=np.uint8)
-
-    sky_top = np.array([24, 28, 46], dtype=np.uint8)
-    sky_bottom = np.array([12, 12, 20], dtype=np.uint8)
-    gradient = np.linspace(0, 1, height)[:, None]
-    sky = (sky_top * (1 - gradient) + sky_bottom * gradient).astype(np.uint8)
-    frame[:] = sky[:, None, :]
-
-    lane_width = int(width * 0.42)
-    lane_x1 = (width - lane_width) // 2
-    lane_x2 = lane_x1 + lane_width
-    frame[:, lane_x1:lane_x2] = (20, 22, 30)
-
-    speed = loop_length / max(duration, 1.0)
-    bob = int(math.sin(t * 2.6) * 8)
-
-    for platform in platforms:
-        z = (platform["offset"] - t * speed) % loop_length
-        depth = z / loop_length
-        perspective = 1.0 - depth
-        if perspective <= 0:
-            continue
-        y = int(height * 0.08 + (1 - depth) * height * 0.92) + bob
-        block_w = int(lane_width * platform["width"] * (0.2 + 0.8 * perspective))
-        block_h = int(height * platform["height"] * (0.2 + 0.8 * perspective))
-        center_x = int(width * 0.5 + platform["x"] * lane_width * 0.35)
-        x1 = max(lane_x1, center_x - block_w // 2)
-        x2 = min(lane_x2, center_x + block_w // 2)
-        y1 = max(0, y - block_h // 2)
-        y2 = min(height, y + block_h // 2)
-        if y2 <= 0 or y1 >= height:
-            continue
-        frame[y1:y2, x1:x2] = (90, 95, 110)
-        frame[y1:y1 + 4, x1:x2] = (120, 125, 140)
-
-    return frame
-
-
-def _procedural_background(duration: float) -> VideoClip:
-    resolution = TARGET_RESOLUTION
-    loop_length = max(8.0, min(14.0, duration))
-    platform_count = 140
-    spacing = loop_length / 20
-    platforms = _generate_platforms(seed=42, count=platform_count, spacing=spacing)
-
-    def make_frame(t: float) -> np.ndarray:
-        return _render_frame(t, duration, resolution, platforms, loop_length)
-
-    return VideoClip(make_frame=make_frame, duration=duration).set_fps(TARGET_FPS)
+def _load_background(audio_duration: float) -> VideoFileClip:
+    backgrounds = sorted(MINECRAFT_BG_DIR.glob("*.mp4"))
+    if not backgrounds:
+        raise RuntimeError("No Minecraft background videos found in assets/minecraft.")
+    bg_path = random.choice(backgrounds)
+    bg = VideoFileClip(str(bg_path)).without_audio()
+    bg = _fit_background(bg)
+    if bg.duration >= audio_duration:
+        bg = bg.subclip(0, audio_duration)
+    else:
+        bg = bg.fx(vfx.loop, duration=audio_duration)
+    return bg
 
 
 def _chunk_subtitles(text: str, min_words: int = 2, max_words: int = 6) -> list[str]:
@@ -173,7 +127,7 @@ def build_video(
 ) -> VideoBuildResult:
     with AudioFileClip(str(audio_path)) as audio_clip:
         audio_duration = float(audio_clip.duration)
-        background = _procedural_background(audio_duration)
+        background = _load_background(audio_duration)
         subtitle_clips = _build_subtitles(script_text, audio_duration)
         layers = [background] + subtitle_clips
 
