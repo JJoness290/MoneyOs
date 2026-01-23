@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import edge_tts
-from moviepy.audio.fx.all import audio_normalize
 from moviepy.editor import AudioFileClip
 
 from app.config import DEFAULT_VOICE, TTS_RATE
@@ -15,22 +14,33 @@ class TTSResult:
     duration_seconds: float
 
 
-def _get_audio_duration(audio_path: Path) -> float:
-    from moviepy.editor import AudioFileClip
-
-    with AudioFileClip(str(audio_path)) as clip:
-        return float(clip.duration)
+def _estimate_seconds(text: str) -> float:
+    word_count = len(text.split())
+    return word_count / 2.2
 
 
-def synthesize_speech(text: str, output_path: Path, voice: str = DEFAULT_VOICE) -> TTSResult:
+def generate_tts(script_text: str, output_path: Path, voice: str = DEFAULT_VOICE) -> TTSResult:
+    """
+    Generates full audio from text in ONE pass.
+    Returns duration in seconds.
+    """
     async def _run() -> None:
-        communicate = edge_tts.Communicate(text, voice=voice, rate=TTS_RATE)
+        communicate = edge_tts.Communicate(script_text, voice=voice, rate=TTS_RATE)
         await communicate.save(str(output_path))
 
     asyncio.run(_run())
-    with AudioFileClip(str(output_path)) as clip:
-        normalized = audio_normalize(clip).volumex(1.05)
-        normalized.write_audiofile(str(output_path), logger=None)
-        normalized.close()
-    duration = _get_audio_duration(output_path)
+
+    audio = AudioFileClip(str(output_path))
+    duration = float(audio.duration)
+    audio.close()
+
+    if duration <= 1:
+        raise RuntimeError("Generated audio is too short or invalid")
+    if duration < 30:
+        raise RuntimeError("Generated audio is too short for TikTok length requirements")
+
+    expected = _estimate_seconds(script_text)
+    if duration + 1 < expected:
+        raise RuntimeError("Generated audio appears truncated compared to script length")
+
     return TTSResult(audio_path=output_path, duration_seconds=duration)

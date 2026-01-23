@@ -4,7 +4,7 @@ from pathlib import Path
 
 from app.config import AUDIO_DIR, MIN_AUDIO_SECONDS, VIDEO_DIR
 from app.core.script_gen import ScriptResult, generate_script, sanitize_script
-from app.core.tts import TTSResult, synthesize_speech
+from app.core.tts import TTSResult, generate_tts
 from app.core.video_builder import VideoBuildResult, build_video
 
 
@@ -34,7 +34,7 @@ def run_pipeline(status_callback) -> PipelineResult:
 
     status_callback("Generating script...")
     audio_path = _build_audio_path()
-    tts_result = synthesize_speech(sanitized_script, audio_path)
+    tts_result = generate_tts(sanitized_script, audio_path)
 
     status_callback("Rendering video...")
     video_path = _build_video_path()
