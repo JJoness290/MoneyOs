@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from app.config import MIN_AUDIO_SECONDS
 
 WORDS_PER_SECOND = 3.0
+_SCRIPT_GENERATED = False
 
 
 @dataclass
@@ -130,41 +131,43 @@ def _beat_types() -> list[str]:
 
 def _short_sentences() -> list[str]:
     return [
-        "{name} hesitated when {detail} came up.",
-        "It felt wrong in {location} after {detail}.",
-        "{other} pulled back once {detail} surfaced.",
-        "The {object} felt heavier because of {detail}.",
-        "That was the first crack in their plan.",
-        "The room went quiet when {other} mentioned {detail}.",
-        "It hit harder than {name} expected, mostly because of {detail}.",
+        "{name} froze when {detail} slipped out.",
+        "It felt off in {location} right after {detail}.",
+        "{other} backed off once {detail} came up.",
+        "The {object} suddenly felt heavy because of {detail}.",
+        "That was the first crack in what they believed.",
+        "The room went quiet when {other} said {detail}.",
+        "It hit harder than {name} expected, and they could feel it.",
     ]
 
 
 def _medium_templates() -> list[str]:
     return [
-        "{name} found {object} near {location}, and it shifted the day.",
-        "{name} stepped into {location} and felt the mood change.",
-        "{name} trusted {other}, even though {other} looked unsure.",
-        "{name} kept {object} close, like it might explain everything.",
-        "{name} heard the rumor again at {location}, and it sounded different.",
-        "{name} watched {other} hesitate, then made a choice.",
-        "{name} noticed how {location} was emptier than usual.",
-        "{name} promised to fix it, not because it was easy, but because it mattered.",
-        "{name} told {other} the truth, and it landed like a weight.",
-        "{name} admitted {detail}, and {other} didn't argue.",
+        "{name} found {object} near {location}, and it messed with their plan.",
+        "{name} walked into {location} and felt the mood drop.",
+        "{name} still trusted {other}, even though {other} looked unsure.",
+        "{name} kept {object} close, like it might explain the mess.",
+        "{name} heard the rumor again at {location}, and it sounded worse.",
+        "{name} watched {other} hesitate, then made a call anyway.",
+        "{name} noticed {location} was emptier than usual, and it felt wrong.",
+        "{name} promised to fix it, not because it was easy, but because it mattered to them.",
+        "{name} told {other} the truth, and it landed heavy.",
+        "{name} admitted {detail}, and {other} didn't even flinch.",
+        "{name} tried to laugh it off, but {detail} stuck around.",
     ]
 
 
 def _long_templates() -> list[str]:
     return [
-        "When {name} finally met {other} at {location}, the whole story shifted, because {object} was not a clue, it was a warning.",
+        "When {name} finally met {other} at {location}, the whole story shifted, because {object} wasn't a clue, it was a warning.",
         "{name} followed the trail back through {location}, and the people there filled in the missing hours one by one.",
-        "{other} admitted the plan had failed, and {name} realized the mistake had been theirs from the start.",
+        "{other} admitted the plan had failed, and {name} realized the mistake was theirs from the start.",
         "By the time {name} opened {object}, {other} had already disappeared, leaving only a choice and a mess.",
         "{name} remembered the first time they walked into {location}, and how the promise they made back then now felt dangerous.",
-        "The mistake was not just the decision, it was the silence after it, and {name} could feel the cost growing.",
+        "The mistake wasn't just the decision, it was the silence after it, and {name} could feel the cost growing.",
         "{name} kept the secret too long, and when {other} found out at {location}, nothing about their friendship was the same.",
         "The trouble started with {detail}, and {name} could feel the fallout spreading.",
+        "{name} tried to make it right, but {detail} kept pulling things apart.",
     ]
 
 
@@ -319,18 +322,32 @@ def _sentence_from_beat(state: StoryState, beat: dict, used_sentences: list[str]
             state.last_template_key = "fallback"
             return fallback
 
-    state.last_template_key = "fallback"
-    return fallback
+    raise RuntimeError("Unable to generate a unique sentence without repetition.")
+
+
+def _split_sentences(text: str) -> list[str]:
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    return [sentence.strip() for sentence in sentences if sentence.strip()]
+
+
+def _validate_no_repetition(sentences: list[str]) -> None:
+    for index, sentence in enumerate(sentences):
+        for prior in sentences[:index]:
+            if _sentence_similarity(sentence, prior) >= 0.6:
+                raise RuntimeError("Script repetition detected.")
 
 
 def _story_seed(topic: str) -> list[str]:
     return [
-        f"There is a story about {topic}, but it starts with a small moment.",
-        "The kind you almost skip past.",
+        f"Alright, here's what happened with {topic}.",
+        "It started small, the kind of thing you'd normally skip.",
     ]
 
 
 def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
+    global _SCRIPT_GENERATED
+    if _SCRIPT_GENERATED:
+        raise RuntimeError("Script already generated; reuse the existing script.")
     topic = random.choice(
         [
             "a city project that went quiet overnight",
@@ -364,7 +381,12 @@ def generate_script(min_seconds: int = MIN_AUDIO_SECONDS) -> ScriptResult:
 
     script = "\n".join(lines).strip()
     script = sanitize_script(script)
-    return ScriptResult(text=script, estimated_seconds=_estimate_seconds(script))
+    estimated_seconds = _estimate_seconds(script)
+    if estimated_seconds < float(min_seconds):
+        raise RuntimeError("Script length is shorter than required duration.")
+    _validate_no_repetition(_split_sentences(script))
+    _SCRIPT_GENERATED = True
+    return ScriptResult(text=script, estimated_seconds=estimated_seconds)
 
 
 def expand_script_once(script_text: str) -> ScriptResult:
